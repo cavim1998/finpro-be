@@ -16,3 +16,611 @@ model Sample {
 
   @@map("samples")
 }
+
+/**
+ * =========================
+ * ENUMS
+ * =========================
+ */
+
+enum RoleCode {
+  CUSTOMER
+  SUPER_ADMIN
+  OUTLET_ADMIN
+  WORKER
+  DRIVER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum IdentityProvider {
+  EMAIL
+  GOOGLE
+  FACEBOOK
+  TWITTER
+}
+
+enum StationType {
+  WASHING
+  IRONING
+  PACKING
+}
+
+enum StationStatus {
+  PENDING
+  IN_PROGRESS
+  WAITING_BYPASS
+  COMPLETED
+}
+
+enum PickupStatus {
+  WAITING_DRIVER
+  DRIVER_ASSIGNED
+  PICKED_UP
+  ARRIVED_OUTLET
+  CANCELED
+}
+
+enum OrderStatus {
+  WAITING_DRIVER_PICKUP
+  ON_THE_WAY_TO_OUTLET
+  ARRIVED_AT_OUTLET
+  WASHING
+  IRONING
+  PACKING
+  WAITING_PAYMENT
+  READY_TO_DELIVER
+  DELIVERING_TO_CUSTOMER
+  RECEIVED_BY_CUSTOMER
+  CANCELED
+}
+
+enum TaskType {
+  PICKUP
+  DELIVERY
+}
+
+enum TaskStatus {
+  AVAILABLE
+  ASSIGNED
+  IN_PROGRESS
+  DONE
+  CANCELED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+enum NotificationType {
+  PAYMENT_REMINDER
+  ORDER_STATUS
+  GENERAL
+}
+
+enum ComplaintType {
+  DAMAGED
+  MISSING
+  NOT_MATCH
+  OTHER
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+enum BypassStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
+enum ShiftAssignmentStatus {
+  SCHEDULED
+  ON_DUTY
+  OFF_DUTY
+}
+
+/**
+ * =========================
+ * USERS & AUTH
+ * =========================
+ */
+
+model User {
+  id   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  role RoleCode @default(CUSTOMER)
+
+  email           String?    @unique
+  passwordHash    String?
+  isEmailVerified Boolean    @default(false)
+  status          UserStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile     UserProfile?
+  identities  UserIdentity[]
+  emailTokens EmailVerificationToken[]
+  resetTokens PasswordResetToken[]
+
+  addresses      UserAddress[]
+  pickupRequests PickupRequest[] @relation("CustomerPickupRequests")
+  orders         Order[]         @relation("CustomerOrders")
+
+  // Staff/Driver
+  outletStaff OutletStaff[]
+  driverTasks DriverTask[]  @relation("DriverTasks")
+
+  // Audit (admin actions)
+  createdOrders   Order[]         @relation("CreatedByOutletAdmin")
+  approvedBypass  BypassRequest[] @relation("ApprovedByOutletAdmin")
+  requestedBypass BypassRequest[] @relation("RequestedByWorker")
+
+  notifications    Notification[]
+  complaints       Complaint[]
+  assignedStations OrderStation[] @relation("OrderStationWorker")
+}
+
+model UserProfile {
+  userId         String   @id @db.Uuid
+  fullName       String
+  phone          String?
+  photoUrl       String?
+  photoMime      String?
+  photoSizeBytes Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserIdentity {
+  id             Int              @id @default(autoincrement())
+  userId         String           @db.Uuid
+  provider       IdentityProvider
+  providerUserId String
+  createdAt      DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+model EmailVerificationToken {
+  id        Int       @id @default(autoincrement())
+  userId    String    @db.Uuid
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    String    @db.Uuid
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/**
+ * =========================
+ * CUSTOMER ADDRESSES & OUTLETS
+ * =========================
+ */
+
+model UserAddress {
+  id            Int      @id @default(autoincrement())
+  userId        String   @db.Uuid
+  label         String?
+  receiverName  String?
+  receiverPhone String?
+  addressText   String
+  latitude      Decimal? @db.Decimal(10, 7)
+  longitude     Decimal? @db.Decimal(10, 7)
+  isPrimary     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  pickupRequests PickupRequest[]
+
+  @@index([userId])
+}
+
+model Outlet {
+  id              Int      @id @default(autoincrement())
+  name            String
+  addressText     String
+  latitude        Decimal? @db.Decimal(10, 7)
+  longitude       Decimal? @db.Decimal(10, 7)
+  serviceRadiusKm Decimal  @default(5.00) @db.Decimal(6, 2)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  staff          OutletStaff[]
+  shifts         Shift[]
+  pickupRequests PickupRequest[]
+  orders         Order[]
+  driverTasks    DriverTask[]
+
+  @@index([isActive])
+}
+
+/**
+ * =========================
+ * STAFF, SHIFT, ATTENDANCE
+ * (Role staff dibaca dari User.role)
+ * =========================
+ */
+
+model OutletStaff {
+  id            Int          @id @default(autoincrement())
+  outletId      Int
+  userId        String       @db.Uuid
+  workerStation StationType?
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+
+  outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  attendanceLogs   AttendanceLog[]
+  shiftAssignments ShiftAssignment[]
+
+  @@unique([outletId, userId])
+  @@index([userId])
+  @@index([outletId])
+}
+
+model Shift {
+  id        Int      @id @default(autoincrement())
+  outletId  Int
+  shiftDate DateTime @db.Date
+  startTime DateTime @db.Time
+  endTime   DateTime @db.Time
+  createdAt DateTime @default(now())
+
+  outlet      Outlet            @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  assignments ShiftAssignment[]
+
+  @@index([outletId, shiftDate])
+}
+
+model ShiftAssignment {
+  id            Int                   @id @default(autoincrement())
+  shiftId       Int
+  outletStaffId Int
+  status        ShiftAssignmentStatus @default(SCHEDULED)
+  createdAt     DateTime              @default(now())
+
+  shift Shift       @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  staff OutletStaff @relation(fields: [outletStaffId], references: [id], onDelete: Cascade)
+
+  @@index([shiftId])
+  @@index([outletStaffId])
+}
+
+model AttendanceLog {
+  id            Int       @id @default(autoincrement())
+  outletStaffId Int
+  date          DateTime  @db.Date
+  clockInAt     DateTime?
+  clockOutAt    DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  staff OutletStaff @relation(fields: [outletStaffId], references: [id], onDelete: Cascade)
+
+  @@unique([outletStaffId, date])
+}
+
+/**
+ * =========================
+ * MASTER LAUNDRY ITEMS
+ * =========================
+ */
+
+model LaundryItem {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems        OrderItem[]
+  stationItemCounts StationItemCount[]
+  bypassDiffs       BypassRequestDiff[]
+}
+
+/**
+ * =========================
+ * PICKUP REQUEST & ORDER
+ * =========================
+ */
+
+model PickupRequest {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId        String       @db.Uuid
+  addressId         Int
+  scheduledPickupAt DateTime
+  notes             String?
+  assignedOutletId  Int
+  status            PickupStatus @default(WAITING_DRIVER)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  customer User        @relation("CustomerPickupRequests", fields: [customerId], references: [id], onDelete: Cascade)
+  address  UserAddress @relation(fields: [addressId], references: [id], onDelete: Restrict)
+  outlet   Outlet      @relation(fields: [assignedOutletId], references: [id], onDelete: Restrict)
+
+  order       Order?
+  driverTasks DriverTask[]
+
+  @@index([customerId])
+  @@index([assignedOutletId])
+  @@index([status])
+}
+
+model Order {
+  id                     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderNo                String @unique
+  pickupRequestId        String @unique @db.Uuid
+  outletId               Int
+  customerId             String @db.Uuid
+  createdByOutletAdminId String @db.Uuid
+
+  totalWeightKg  Decimal @db.Decimal(10, 2)
+  subtotalAmount Decimal @default(0) @db.Decimal(14, 2)
+  deliveryFee    Decimal @default(0) @db.Decimal(14, 2)
+  totalAmount    Decimal @default(0) @db.Decimal(14, 2)
+
+  status OrderStatus @default(WAITING_DRIVER_PICKUP)
+
+  paymentDueAt        DateTime?
+  paidAt              DateTime?
+  deliveredAt         DateTime?
+  receivedConfirmedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pickupRequest PickupRequest @relation(fields: [pickupRequestId], references: [id], onDelete: Restrict)
+  outlet        Outlet        @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  customer      User          @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy     User          @relation("CreatedByOutletAdmin", fields: [createdByOutletAdminId], references: [id], onDelete: Restrict)
+
+  items          OrderItem[]
+  stations       OrderStation[]
+  payments       Payment[]
+  driverTasks    DriverTask[]
+  complaints     Complaint[]
+
+  @@index([outletId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  orderId   String   @db.Uuid
+  itemId    Int
+  qty       Int
+  createdAt DateTime @default(now())
+
+  order Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item  LaundryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, itemId])
+  @@index([orderId])
+}
+
+/**
+ * =========================
+ * STATIONS + RECOUNT + BYPASS
+ * =========================
+ */
+
+model OrderStation {
+  id               Int           @id @default(autoincrement())
+  orderId          String        @db.Uuid
+  stationType      StationType
+  assignedWorkerId String?       @db.Uuid
+  startedAt        DateTime?
+  completedAt      DateTime?
+  status           StationStatus @default(PENDING)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  worker User? @relation("OrderStationWorker", fields: [assignedWorkerId], references: [id], onDelete: SetNull)
+
+  itemCounts     StationItemCount[]
+  bypassRequests BypassRequest[]
+
+  @@unique([orderId, stationType])
+  @@index([orderId])
+  @@index([status])
+}
+
+model StationItemCount {
+  id             Int @id @default(autoincrement())
+  orderStationId Int
+  itemId         Int
+  qty            Int
+
+  station OrderStation @relation(fields: [orderStationId], references: [id], onDelete: Cascade)
+  item    LaundryItem  @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([orderStationId, itemId])
+}
+
+model BypassRequest {
+  id                  Int          @id @default(autoincrement())
+  orderStationId      Int
+  requestedByWorkerId String       @db.Uuid
+  approvedByAdminId   String?      @db.Uuid
+  reason              String
+  status              BypassStatus @default(REQUESTED)
+  requestedAt         DateTime     @default(now())
+  decidedAt           DateTime?
+
+  orderStation OrderStation @relation(fields: [orderStationId], references: [id], onDelete: Cascade)
+
+  requestedBy User  @relation("RequestedByWorker", fields: [requestedByWorkerId], references: [id], onDelete: Restrict)
+  approvedBy  User? @relation("ApprovedByOutletAdmin", fields: [approvedByAdminId], references: [id], onDelete: SetNull)
+
+  diffs   BypassRequestDiff[]
+
+  @@index([orderStationId])
+  @@index([status])
+}
+
+model BypassRequestDiff {
+  id              Int @id @default(autoincrement())
+  bypassRequestId Int
+  itemId          Int
+  prevQty         Int
+  currentQty      Int
+
+  bypassRequest BypassRequest @relation(fields: [bypassRequestId], references: [id], onDelete: Cascade)
+  item          LaundryItem   @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([bypassRequestId, itemId])
+}
+
+/**
+ * =========================
+ * DRIVER TASKS
+ * =========================
+ */
+
+model DriverTask {
+  id       Int      @id @default(autoincrement())
+  taskType TaskType
+  outletId Int
+  driverId String   @db.Uuid
+
+  pickupRequestId String? @db.Uuid
+  orderId         String? @db.Uuid
+
+  fromLat Decimal? @db.Decimal(10, 7)
+  fromLng Decimal? @db.Decimal(10, 7)
+  toLat   Decimal? @db.Decimal(10, 7)
+  toLng   Decimal? @db.Decimal(10, 7)
+
+  status      TaskStatus @default(AVAILABLE)
+  assignedAt  DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+
+  outlet        Outlet         @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  driver        User           @relation("DriverTasks", fields: [driverId], references: [id], onDelete: Restrict)
+  pickupRequest PickupRequest? @relation(fields: [pickupRequestId], references: [id], onDelete: SetNull)
+  order         Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([driverId, status])
+  @@index([outletId])
+}
+
+/**
+ * =========================
+ * PAYMENTS + NOTIFICATIONS
+ * =========================
+ */
+
+model Payment {
+  id          Int           @id @default(autoincrement())
+  orderId     String        @db.Uuid
+  provider    String
+  amount      Decimal       @db.Decimal(14, 2)
+  status      PaymentStatus @default(PENDING)
+  gatewayRef  String?       @unique
+  paidAt      DateTime?
+  payloadJson Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    String           @db.Uuid
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([type])
+}
+
+/**
+ * =========================
+ * COMPLAINTS
+ * =========================
+ */
+
+model Complaint {
+  id          Int             @id @default(autoincrement())
+  orderId     String          @db.Uuid
+  customerId  String          @db.Uuid
+  type        ComplaintType
+  description String
+  status      ComplaintStatus @default(OPEN)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  order    Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer User  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  attachments ComplaintAttachment[]
+
+  @@index([orderId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model ComplaintAttachment {
+  id          Int      @id @default(autoincrement())
+  complaintId Int
+  fileUrl     String
+  mime        String?
+  sizeBytes   Int?
+  createdAt   DateTime @default(now())
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  @@index([complaintId])
+}

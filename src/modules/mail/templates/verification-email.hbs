@@ -1,0 +1,130 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify Your Email</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        color: #2f4f4f;
+        margin: 0;
+        padding: 0;
+        background-color: #eaf7f9;
+      }
+
+      .container {
+        max-width: 600px;
+        margin: 40px auto;
+        padding: 24px;
+        background-color: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(29, 172, 188, 0.15);
+      }
+
+      .header {
+        background-color: #1dacbc;
+        color: #ffffff;
+        padding: 32px 20px;
+        text-align: center;
+        border-radius: 16px 16px 0 0;
+        margin: -24px -24px 24px -24px;
+      }
+
+      .header h1 {
+        margin: 0;
+        font-size: 26px;
+        font-weight: 700;
+      }
+
+      .content {
+        padding: 10px 0;
+        text-align: center;
+      }
+
+      .content p {
+        margin: 16px 0;
+        font-size: 16px;
+        color: #2f4f4f;
+      }
+
+      .button {
+        display: inline-block;
+        background-color: #1dacbc;
+        color: #ffffff !important;
+        padding: 14px 36px;
+        text-decoration: none;
+        border-radius: 999px;
+        font-weight: 600;
+        margin: 24px 0;
+        font-size: 16px;
+      }
+
+      .code {
+        background-color: #f3fbfc;
+        padding: 16px;
+        border-radius: 10px;
+        border: 1px dashed #1dacbc;
+        margin: 20px 0;
+        word-break: break-all;
+        font-family: monospace;
+        font-size: 14px;
+        color: #1dacbc;
+      }
+
+      .expiry {
+        color: #e5533d;
+        font-size: 14px;
+        margin-top: 16px;
+      }
+
+      .footer {
+        text-align: center;
+        color: #6b8f94;
+        font-size: 12px;
+        margin-top: 36px;
+        padding-top: 20px;
+        border-top: 1px solid #e0f1f4;
+      }
+    </style>
+  </head>
+  <body>
+
+    <div class="container">
+
+      <div class="header">
+        <h1>Verify Your Email</h1>
+      </div>
+
+      <div class="content">
+        <p>Hi <strong>{{fullName}}</strong> 👋</p>
+
+        <p>
+          Thank you for signing up! Please verify your email address to
+          continue.
+        </p>
+
+        <a href="{{verifyLink}}" class="button">
+          Verify Email
+        </a>
+
+        <p>Or copy and paste the link below into your browser:</p>
+
+        <div class="code">{{verifyLink}}</div>
+
+        <p class="expiry">⏰ This link will expire in 24 hours</p>
+
+        <p style="margin-top: 28px; font-size: 14px; color: #6B8F94;">
+          If you did not create an account, you can safely ignore this email.
+        </p>
+      </div>
+
+      <div class="footer">
+        <p>&copy; 2026 LaundryQ</p>
+        <p>This is an automated message. Please do not reply.</p>
+      </div>
+
+    </div>
+
+  </body>
+</html>
