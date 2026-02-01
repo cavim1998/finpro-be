@@ -63,12 +63,12 @@ export class AuthService {
     // Generate verification token
     const verifyToken = randomBytes(32).toString("hex");
 
-    // Save verification token with 24 hour expiry
+    // Save verification token with 1 hour expiry
     await this.prisma.emailVerificationToken.create({
       data: {
         userId: user.id,
         token: verifyToken,
-        expiresAt: new Date(Date.now() + 86400000), // 24 hours
+        expiresAt: new Date(Date.now() + 3600000), // 1 hour
       },
     });
 
@@ -276,7 +276,7 @@ export class AuthService {
       data: {
         userId: user.id,
         token,
-        expiresAt: new Date(Date.now() + 86400000), // 24 hours
+        expiresAt: new Date(Date.now() + 3600000), // 1 hour
       },
     });
 

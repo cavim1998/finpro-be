@@ -48,7 +48,11 @@ export class App {
       cloudinaryService,
       mailService,
     );
-    const userService = new UserService(prismaClient);
+    const userService = new UserService(
+      prismaClient,
+      cloudinaryService,
+      mailService,
+    );
 
     // controllers
     const sampleController = new SampleController(sampleService);
@@ -69,7 +73,11 @@ export class App {
       validationMiddleware,
       uploaderMiddleware,
     );
-    const userRouter = new UserRouter(userController);
+    const userRouter = new UserRouter(
+      userController,
+      validationMiddleware,
+      uploaderMiddleware,
+    );
 
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/auth", authRouter.getRouter());
