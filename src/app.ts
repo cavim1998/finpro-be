@@ -18,6 +18,9 @@ import { SampleService } from "./modules/sample/sample.service.js";
 import { UserController } from "./modules/users/user.controller.js";
 import { UserRouter } from "./modules/users/user.router.js";
 import { UserService } from "./modules/users/user.service.js";
+import { OutletRouter } from "./modules/outlet/outlet.router.js";
+import { OutletService } from "./modules/outlet/outlet.service.js";
+import { OutletController } from "./modules/outlet/outlet.controller.js";
 
 export class App {
   app: Express;
@@ -54,10 +57,13 @@ export class App {
       mailService,
     );
 
+    const outletService = new OutletService(prismaClient);
+
     // controllers
     const sampleController = new SampleController(sampleService);
     const authController = new AuthController(authService);
     const userController = new UserController(userService);
+    const outletController = new OutletController(outletService);
 
     // middlewares
     const validationMiddleware = new ValidationMiddleware();
@@ -68,6 +74,7 @@ export class App {
       sampleController,
       validationMiddleware,
     );
+
     const authRouter = new AuthRouter(
       authController,
       validationMiddleware,
@@ -79,9 +86,15 @@ export class App {
       uploaderMiddleware,
     );
 
+    const outletRouter = new OutletRouter(
+      outletController,
+      validationMiddleware,
+    );
+
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/auth", authRouter.getRouter());
     this.app.use("/users", userRouter.getRouter());
+    this.app.use("/outlet", outletRouter.getRouter());
   }
 
   private handleError() {
