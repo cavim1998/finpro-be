@@ -4,6 +4,7 @@ import { compileTemplate } from "./template.compiler.js";
 
 type TemplateData = {
   verifyLink?: string;
+  verificationCode?: string;
   resetLink?: string;
   fullName?: string;
   dashboardLink?: string;
@@ -34,17 +35,24 @@ export class MailService {
     to: string,
     fullName: string,
     verifyLink: string,
+    verificationCode: string,
   ) => {
     const html = compileTemplate("verification-email", {
       fullName,
       verifyLink,
+      verificationCode,
     });
     await this.sendEmail(to, "Verify Your Email Address", html);
   };
 
-  sendResetPasswordEmail = async (to: string, resetLink: string) => {
+  sendResetPasswordEmail = async (
+    to: string,
+    resetLink: string,
+    fullName?: string,
+  ) => {
     const html = compileTemplate("reset-password-email", {
       resetLink,
+      fullName,
     });
     await this.sendEmail(to, "Reset Your Password", html);
   };

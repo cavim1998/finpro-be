@@ -6,7 +6,7 @@ export class AuthController {
 
   register = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const result = await this.authService.register(req.body, req.file);
+      const result = await this.authService.register(req.body);
       res.status(201).send(result);
     } catch (error) {
       next(error);
@@ -16,6 +16,33 @@ export class AuthController {
   login = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const result = await this.authService.login(req.body);
+      res.status(200).send(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  googleLogin = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.authService.googleLogin(req.body);
+      res.status(200).send(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  googleSignup = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.authService.googleSignup(req.body);
+      res.status(201).send(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  logout = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.authService.logout();
       res.status(200).send(result);
     } catch (error) {
       next(error);

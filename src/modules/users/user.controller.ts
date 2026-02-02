@@ -11,7 +11,7 @@ export class UserController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
       const data = await this.userService.getUser(authUser.sub);
-      res.status(200).send({ success: true, data });
+      res.status(200).send({ status: "success", data });
     } catch (err) {
       next(err);
     }
@@ -27,7 +27,7 @@ export class UserController {
       }
 
       const data = await this.userService.getUser(req.params.id);
-      res.status(200).send({ success: true, data });
+      res.status(200).send({ status: "success", data });
     } catch (err) {
       next(err);
     }
@@ -39,7 +39,7 @@ export class UserController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
       const data = await this.userService.getProfile(authUser.sub);
-      res.status(200).send({ success: true, data });
+      res.status(200).send({ status: "success", data });
     } catch (err) {
       next(err);
     }
@@ -50,12 +50,37 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const data = await this.userService.updateProfile(
+      const data = await this.userService.updateProfile(authUser.sub, req.body);
+      res
+        .status(200)
+        .send({
+          status: "success",
+          message: "Profile updated successfully",
+          data,
+        });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  uploadProfilePhoto = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const authUser = res.locals.user as { sub?: string };
+      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
+
+      const data = await this.userService.updateProfilePhoto(
         authUser.sub,
-        req.body,
         req.file,
       );
-      res.status(200).send({ success: true, data });
+      res.status(200).send({
+        status: "success",
+        message: "Profile photo uploaded successfully",
+        data,
+      });
     } catch (err) {
       next(err);
     }

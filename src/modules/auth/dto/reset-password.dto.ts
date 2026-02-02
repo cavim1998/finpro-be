@@ -7,6 +7,6 @@ export class ResetPasswordDTO {
 
   @IsNotEmpty()
   @IsString()
-  @MinLength(6)
-  newPassword!: string;
+  @MinLength(8)
+  password!: string;
 }

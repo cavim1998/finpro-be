@@ -24,6 +24,13 @@ export class UserRouter {
     // Get all users (admin)
     this.router.get("/", verifyToken(JWT_SECRET), this.userController.getUsers);
 
+    // Get current user profile (MUST be before /:id route)
+    this.router.get(
+      "/profile",
+      verifyToken(JWT_SECRET),
+      this.userController.getProfile,
+    );
+
     // Get user by ID
     this.router.get(
       "/:id",
@@ -31,39 +38,39 @@ export class UserRouter {
       this.userController.getUser,
     );
 
-    // Get current user profile
-    this.router.get(
-      "/profile/me",
-      verifyToken(JWT_SECRET),
-      this.userController.getProfile,
-    );
-
-    // Update profile
+    // Update profile (name, phone, address)
     this.router.put(
-      "/profile/me",
+      "/profile",
       verifyToken(JWT_SECRET),
-      this.uploaderMiddleware.upload().single("photo"),
       this.validationMiddleware.validateBody(UpdateProfileDTO),
       this.userController.updateProfile,
     );
 
-    // Change password
-    this.router.put(
-      "/profile/change-password",
+    // Upload profile photo
+    this.router.post(
+      "/profile/photo",
       verifyToken(JWT_SECRET),
-      this.validationMiddleware.validateBody(ChangePasswordDTO),
-      this.userController.changePassword,
+      this.uploaderMiddleware.upload().single("file"),
+      this.userController.uploadProfilePhoto,
     );
 
-    // Update email
+    // Change email
     this.router.put(
-      "/profile/update-email",
+      "/profile/email",
       verifyToken(JWT_SECRET),
       this.validationMiddleware.validateBody(UpdateEmailDTO),
       this.userController.updateEmail,
     );
 
-    // Request email verification
+    // Change password
+    this.router.put(
+      "/profile/password",
+      verifyToken(JWT_SECRET),
+      this.validationMiddleware.validateBody(ChangePasswordDTO),
+      this.userController.changePassword,
+    );
+
+    // Request email verification (optional helper)
     this.router.post(
       "/profile/request-verification",
       verifyToken(JWT_SECRET),

@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { UploaderMiddleware } from "../../middlewares/uploader.middleware.js";
 import { ValidationMiddleware } from "../../middlewares/validation.middleware.js";
 import { AuthController } from "./auth.controller.js";
 import { ForgotPasswordDTO } from "./dto/forgot-password.dto.js";
@@ -8,6 +7,9 @@ import { RegisterDTO } from "./dto/register.dto.js";
 import { ResetPasswordDTO } from "./dto/reset-password.dto.js";
 import { VerifyEmailDTO } from "./dto/verify-email.dto.js";
 import { ResendVerificationDTO } from "./dto/resend-verification.dto.js";
+import { GoogleLoginDTO } from "./dto/google-login.dto.js";
+import { verifyToken } from "../../middlewares/jwt.middleware.js";
+import { JWT_SECRET } from "../../config/env.js";
 
 export class AuthRouter {
   private router: Router;
@@ -15,7 +17,6 @@ export class AuthRouter {
   constructor(
     private authController: AuthController,
     private validationMiddleware: ValidationMiddleware,
-    private uploaderMiddleware: UploaderMiddleware,
   ) {
     this.router = Router();
     this.initializedRoutes();
@@ -24,7 +25,6 @@ export class AuthRouter {
   private initializedRoutes = () => {
     this.router.post(
       "/register",
-      this.uploaderMiddleware.upload().single("profileImage"),
       this.validationMiddleware.validateBody(RegisterDTO),
       this.authController.register,
     );
@@ -33,6 +33,28 @@ export class AuthRouter {
       this.validationMiddleware.validateBody(LoginDTO),
       this.authController.login,
     );
+    this.router.post(
+      "/google",
+      this.validationMiddleware.validateBody(GoogleLoginDTO),
+      this.authController.googleLogin,
+    );
+    this.router.post(
+      "/google/login",
+      this.validationMiddleware.validateBody(GoogleLoginDTO),
+      this.authController.googleLogin,
+    );
+    this.router.post(
+      "/google/signup",
+      this.validationMiddleware.validateBody(GoogleLoginDTO),
+      this.authController.googleSignup,
+    );
+
+    this.router.post(
+      "/logout",
+      verifyToken(JWT_SECRET),
+      this.authController.logout,
+    );
+
     this.router.post(
       "/verify-email",
       this.validationMiddleware.validateBody(VerifyEmailDTO),
@@ -48,7 +70,7 @@ export class AuthRouter {
       this.validationMiddleware.validateBody(ForgotPasswordDTO),
       this.authController.forgotPassword,
     );
-    this.router.post(
+    this.router.put(
       "/reset-password",
       this.validationMiddleware.validateBody(ResetPasswordDTO),
       this.authController.resetPassword,

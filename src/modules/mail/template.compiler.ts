@@ -6,6 +6,7 @@ const templatesDir = join(import.meta.url, "../templates");
 
 type TemplateData = {
   verifyLink?: string;
+  verificationCode?: string;
   resetLink?: string;
   fullName?: string;
   dashboardLink?: string;

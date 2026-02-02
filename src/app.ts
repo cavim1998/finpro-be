@@ -75,11 +75,7 @@ export class App {
       validationMiddleware,
     );
 
-    const authRouter = new AuthRouter(
-      authController,
-      validationMiddleware,
-      uploaderMiddleware,
-    );
+    const authRouter = new AuthRouter(authController, validationMiddleware);
     const userRouter = new UserRouter(
       userController,
       validationMiddleware,
