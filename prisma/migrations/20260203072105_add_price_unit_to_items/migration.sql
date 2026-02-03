@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "LaundryItem" ADD COLUMN     "price" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "unit" TEXT NOT NULL DEFAULT 'PCS';

@@ -11,11 +11,11 @@ import { Type } from "class-transformer";
 export class CreateOutletDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsNotEmpty()
-  addressText: string;
+  addressText!: string;
 
   @IsOptional()
   @IsNumber()

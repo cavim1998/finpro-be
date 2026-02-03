@@ -51,13 +51,11 @@ export class UserController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
       const data = await this.userService.updateProfile(authUser.sub, req.body);
-      res
-        .status(200)
-        .send({
-          status: "success",
-          message: "Profile updated successfully",
-          data,
-        });
+      res.status(200).send({
+        status: "success",
+        message: "Profile updated successfully",
+        data,
+      });
     } catch (err) {
       next(err);
     }
