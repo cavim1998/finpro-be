@@ -55,7 +55,7 @@ export class App {
     );
 
     this.app.use("/samples", sampleRouter.getRouter());
-    this.app.use("/outlet", outletRouter.getRouter());
+    this.app.use("/outlets", outletRouter.getRouter());
   }
 
   private handleError() {
