@@ -348,6 +348,8 @@ model AttendanceLog {
 model LaundryItem {
   id        Int      @id @default(autoincrement())
   name      String   @unique
+  price     Int      @default(0) 
+  unit      String   @default("PCS")
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

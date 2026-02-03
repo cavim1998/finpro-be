@@ -12,6 +12,9 @@ import { SampleService } from "./modules/sample/sample.service.js";
 import { OutletService } from "./modules/outlet/outlet.service.js";
 import { OutletController } from "./modules/outlet/outlet.controller.js";
 import { OutletRouter } from "./modules/outlet/outlet.router.js";
+import { LaundryItemService } from "./modules/laundry-item/laundry-item.service.js";
+import { LaundryItemController } from "./modules/laundry-item/laundry-item.controller.js";
+import { LaundryItemRouter } from "./modules/laundry-item/laundry-item.router.js";
 
 export class App {
   app: Express;
@@ -36,10 +39,12 @@ export class App {
     // services
     const sampleService = new SampleService(prismaClient);
     const outletService = new OutletService(prismaClient);
+    const laundryItemService = new LaundryItemService(prismaClient);
 
     // controllers
     const sampleController = new SampleController(sampleService);
     const outletController = new OutletController(outletService);
+    const laundryItemController = new LaundryItemController(laundryItemService);
 
     // middlewares
     const validationMiddleware = new ValidationMiddleware();
@@ -53,9 +58,14 @@ export class App {
       outletController,
       validationMiddleware,
     );
+    const laundryItemRouter = new LaundryItemRouter(
+      laundryItemController,
+      validationMiddleware,
+    );
 
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/outlets", outletRouter.getRouter());
+    this.app.use("/laundry-items", laundryItemRouter.getRouter());
   }
 
   private handleError() {
