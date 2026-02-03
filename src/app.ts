@@ -91,6 +91,7 @@ export class App {
     this.app.use("/auth", authRouter.getRouter());
     this.app.use("/users", userRouter.getRouter());
     this.app.use("/outlet", outletRouter.getRouter());
+    this.app.use("/outlets", outletRouter.getRouter());
   }
 
   private handleError() {

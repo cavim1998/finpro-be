@@ -9,7 +9,7 @@ export class OutletService {
   getAllOutlets = async () => {
     return await this.prisma.outlet.findMany({
       where: { isActive: true },
-      orderBy: { createdAt: "desc" },
+      orderBy: { id: "asc" },
       include: {
         _count: { select: { staff: true } },
       },
