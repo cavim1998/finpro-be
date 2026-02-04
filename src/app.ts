@@ -24,6 +24,9 @@ import { OutletController } from "./modules/outlet/outlet.controller.js";
 import { LaundryItemService } from "./modules/laundry-item/laundry-item.service.js";
 import { LaundryItemController } from "./modules/laundry-item/laundry-item.controller.js";
 import { LaundryItemRouter } from "./modules/laundry-item/laundry-item.router.js";
+import { AttendanceController } from "./modules/attendance/attendance.controller.js";
+import { AttendanceRouter } from "./modules/attendance/attendance.router.js";
+import { AttendanceService } from "./modules/attendance/attendance.service.js";
 
 export class App {
   app: Express;
@@ -96,12 +99,20 @@ export class App {
       validationMiddleware,
     );
 
+    const attendanceService = new AttendanceService(prismaClient);
+    const attendanceController = new AttendanceController(attendanceService);
+    const attendanceRouter = new AttendanceRouter(
+      attendanceController,
+      validationMiddleware,
+    );
+
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/auth", authRouter.getRouter());
     this.app.use("/users", userRouter.getRouter());
     this.app.use("/outlet", outletRouter.getRouter());
     this.app.use("/outlets", outletRouter.getRouter());
     this.app.use("/laundry-items", laundryItemRouter.getRouter());
+    this.app.use("/attendance", attendanceRouter.getRouter());
   }
 
   private handleError() {
