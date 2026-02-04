@@ -137,9 +137,8 @@ enum ShiftAssignmentStatus {
  * USERS & AUTH
  * =========================
  */
-
 model User {
-  id   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id   Int      @id @default(autoincrement())
   role RoleCode @default(CUSTOMER)
 
   email           String?    @unique
@@ -174,7 +173,7 @@ model User {
 }
 
 model UserProfile {
-  userId         String   @id @db.Uuid
+  userId         Int      @id
   fullName       String
   phone          String?
   photoUrl       String?
@@ -188,7 +187,7 @@ model UserProfile {
 
 model UserIdentity {
   id             Int              @id @default(autoincrement())
-  userId         String           @db.Uuid
+  userId         Int
   provider       IdentityProvider
   providerUserId String
   createdAt      DateTime         @default(now())
@@ -201,7 +200,7 @@ model UserIdentity {
 
 model EmailVerificationToken {
   id        Int       @id @default(autoincrement())
-  userId    String    @db.Uuid
+  userId    Int
   token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
@@ -214,7 +213,7 @@ model EmailVerificationToken {
 
 model PasswordResetToken {
   id        Int       @id @default(autoincrement())
-  userId    String    @db.Uuid
+  userId    Int
   token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
@@ -233,7 +232,7 @@ model PasswordResetToken {
 
 model UserAddress {
   id            Int      @id @default(autoincrement())
-  userId        String   @db.Uuid
+  userId        Int
   label         String?
   receiverName  String?
   receiverPhone String?
@@ -281,7 +280,7 @@ model Outlet {
 model OutletStaff {
   id            Int          @id @default(autoincrement())
   outletId      Int
-  userId        String       @db.Uuid
+  userId        Int
   workerStation StationType?
   isActive      Boolean      @default(true)
   createdAt     DateTime     @default(now())
@@ -348,7 +347,7 @@ model AttendanceLog {
 model LaundryItem {
   id        Int      @id @default(autoincrement())
   name      String   @unique
-  price     Int      @default(0) 
+  price     Int      @default(0)
   unit      String   @default("PCS")
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -367,7 +366,7 @@ model LaundryItem {
 
 model PickupRequest {
   id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  customerId        String       @db.Uuid
+  customerId        Int
   addressId         Int
   scheduledPickupAt DateTime
   notes             String?
@@ -393,8 +392,8 @@ model Order {
   orderNo                String @unique
   pickupRequestId        String @unique @db.Uuid
   outletId               Int
-  customerId             String @db.Uuid
-  createdByOutletAdminId String @db.Uuid
+  customerId             Int
+  createdByOutletAdminId Int
 
   totalWeightKg  Decimal @db.Decimal(10, 2)
   subtotalAmount Decimal @default(0) @db.Decimal(14, 2)
@@ -416,11 +415,11 @@ model Order {
   customer      User          @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: Restrict)
   createdBy     User          @relation("CreatedByOutletAdmin", fields: [createdByOutletAdminId], references: [id], onDelete: Restrict)
 
-  items          OrderItem[]
-  stations       OrderStation[]
-  payments       Payment[]
-  driverTasks    DriverTask[]
-  complaints     Complaint[]
+  items       OrderItem[]
+  stations    OrderStation[]
+  payments    Payment[]
+  driverTasks DriverTask[]
+  complaints  Complaint[]
 
   @@index([outletId])
   @@index([customerId])
@@ -451,14 +450,13 @@ model OrderStation {
   id               Int           @id @default(autoincrement())
   orderId          String        @db.Uuid
   stationType      StationType
-  assignedWorkerId String?       @db.Uuid
+  assignedWorkerId Int?
   startedAt        DateTime?
   completedAt      DateTime?
   status           StationStatus @default(PENDING)
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  worker User? @relation("OrderStationWorker", fields: [assignedWorkerId], references: [id], onDelete: SetNull)
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  worker User?  @relation("OrderStationWorker", fields: [assignedWorkerId], references: [id], onDelete: SetNull)
 
   itemCounts     StationItemCount[]
   bypassRequests BypassRequest[]
@@ -483,8 +481,8 @@ model StationItemCount {
 model BypassRequest {
   id                  Int          @id @default(autoincrement())
   orderStationId      Int
-  requestedByWorkerId String       @db.Uuid
-  approvedByAdminId   String?      @db.Uuid
+  requestedByWorkerId Int
+  approvedByAdminId   Int?
   reason              String
   status              BypassStatus @default(REQUESTED)
   requestedAt         DateTime     @default(now())
@@ -495,7 +493,7 @@ model BypassRequest {
   requestedBy User  @relation("RequestedByWorker", fields: [requestedByWorkerId], references: [id], onDelete: Restrict)
   approvedBy  User? @relation("ApprovedByOutletAdmin", fields: [approvedByAdminId], references: [id], onDelete: SetNull)
 
-  diffs   BypassRequestDiff[]
+  diffs BypassRequestDiff[]
 
   @@index([orderStationId])
   @@index([status])
@@ -524,7 +522,7 @@ model DriverTask {
   id       Int      @id @default(autoincrement())
   taskType TaskType
   outletId Int
-  driverId String   @db.Uuid
+  driverId Int
 
   pickupRequestId String? @db.Uuid
   orderId         String? @db.Uuid
@@ -575,7 +573,7 @@ model Payment {
 
 model Notification {
   id        Int              @id @default(autoincrement())
-  userId    String           @db.Uuid
+  userId    Int
   type      NotificationType
   title     String
   message   String
@@ -597,7 +595,7 @@ model Notification {
 model Complaint {
   id          Int             @id @default(autoincrement())
   orderId     String          @db.Uuid
-  customerId  String          @db.Uuid
+  customerId  Int
   type        ComplaintType
   description String
   status      ComplaintStatus @default(OPEN)
