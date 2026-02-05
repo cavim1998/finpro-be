@@ -128,4 +128,113 @@ export class UserController {
       next(err);
     }
   };
+
+  /**
+   * =========================
+   * USER ADDRESS MANAGEMENT
+   * =========================
+   */
+
+  getAddresses = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authUser = res.locals.user as { sub?: string };
+      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
+
+      const addresses = await this.userService.getAddresses(authUser.sub);
+      res.status(200).send({ status: "success", data: addresses });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  createAddress = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authUser = res.locals.user as { sub?: string };
+      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
+
+      const address = await this.userService.createAddress(
+        authUser.sub,
+        req.body,
+      );
+      res.status(201).send({
+        status: "success",
+        message: "Address created successfully",
+        data: address,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateAddress = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authUser = res.locals.user as { sub?: string };
+      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
+
+      const addressId = parseInt(req.params.id, 10);
+      if (isNaN(addressId)) {
+        throw new ApiError("Invalid address ID", 400, "INVALID_ADDRESS_ID");
+      }
+
+      const address = await this.userService.updateAddress(
+        authUser.sub,
+        addressId,
+        req.body,
+      );
+      res.status(200).send({
+        status: "success",
+        message: "Address updated successfully",
+        data: address,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  deleteAddress = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authUser = res.locals.user as { sub?: string };
+      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
+
+      const addressId = parseInt(req.params.id, 10);
+      if (isNaN(addressId)) {
+        throw new ApiError("Invalid address ID", 400, "INVALID_ADDRESS_ID");
+      }
+
+      const result = await this.userService.deleteAddress(
+        authUser.sub,
+        addressId,
+      );
+      res.status(200).send(result);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  setPrimaryAddress = async (
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const authUser = res.locals.user as { sub?: string };
+      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
+
+      const addressId = parseInt(_req.params.id, 10);
+      if (isNaN(addressId)) {
+        throw new ApiError("Invalid address ID", 400, "INVALID_ADDRESS_ID");
+      }
+
+      const address = await this.userService.setPrimaryAddress(
+        authUser.sub,
+        addressId,
+      );
+      res.status(200).send({
+        success: true,
+        data: address,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
 }
