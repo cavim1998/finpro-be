@@ -266,6 +266,7 @@ model Outlet {
   pickupRequests PickupRequest[]
   orders         Order[]
   driverTasks    DriverTask[]
+  shiftTemplates ShiftTemplate[]
 
   @@index([isActive])
 }
@@ -277,11 +278,28 @@ model Outlet {
  * =========================
  */
 
+ model ShiftTemplate {
+  id        Int      @id @default(autoincrement())
+  outletId  Int
+  name      String
+  startTime DateTime @db.Time
+  endTime   DateTime @db.Time
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  assignedStaff OutletStaff[]
+
+  @@index([outletId])
+}
+
 model OutletStaff {
   id            Int          @id @default(autoincrement())
   outletId      Int
   userId        Int
   workerStation StationType?
+  shiftTemplateId Int?         
+  shiftTemplate   ShiftTemplate? @relation(fields: [shiftTemplateId], references: [id])
   isActive      Boolean      @default(true)
   createdAt     DateTime     @default(now())
 
