@@ -44,6 +44,17 @@ CREATE TYPE "BypassStatus" AS ENUM ('REQUESTED', 'APPROVED', 'REJECTED');
 CREATE TYPE "ShiftAssignmentStatus" AS ENUM ('SCHEDULED', 'ON_DUTY', 'OFF_DUTY');
 
 -- CreateTable
+CREATE TABLE "samples" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "samples_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "User" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "role" "RoleCode" NOT NULL DEFAULT 'CUSTOMER',
@@ -144,6 +155,7 @@ CREATE TABLE "OutletStaff" (
     "outletId" INTEGER NOT NULL,
     "userId" UUID NOT NULL,
     "workerStation" "StationType",
+    "workShift" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -190,6 +202,8 @@ CREATE TABLE "AttendanceLog" (
 CREATE TABLE "LaundryItem" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
+    "price" INTEGER NOT NULL DEFAULT 0,
+    "unit" TEXT NOT NULL DEFAULT 'PCS',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

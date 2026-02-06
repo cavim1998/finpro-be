@@ -24,6 +24,12 @@ import { OutletController } from "./modules/outlet/outlet.controller.js";
 import { LaundryItemService } from "./modules/laundry-item/laundry-item.service.js";
 import { LaundryItemController } from "./modules/laundry-item/laundry-item.controller.js";
 import { LaundryItemRouter } from "./modules/laundry-item/laundry-item.router.js";
+import { EmployeeService } from "./modules/employee/employee.service.js";
+import { EmployeeController } from "./modules/employee/employee.controller.js";
+import { EmployeeRouter } from "./modules/employee/employee.router.js";
+import { ShiftService } from "./modules/shift/shift.service.js";
+import { ShiftController } from "./modules/shift/shift.controller.js";
+import { ShiftRouter } from "./modules/shift/shift.router.js";
 
 export class App {
   app: Express;
@@ -59,9 +65,10 @@ export class App {
       cloudinaryService,
       mailService,
     );
-
     const outletService = new OutletService(prismaClient);
     const laundryItemService = new LaundryItemService(prismaClient);
+    const employeeService = new EmployeeService(prismaClient);
+    const shiftService = new ShiftService(prismaClient);
 
     // controllers
     const sampleController = new SampleController(sampleService);
@@ -69,6 +76,8 @@ export class App {
     const userController = new UserController(userService);
     const outletController = new OutletController(outletService);
     const laundryItemController = new LaundryItemController(laundryItemService);
+    const employeeController = new EmployeeController(employeeService);
+    const shiftController = new ShiftController(shiftService);
 
     // middlewares
     const validationMiddleware = new ValidationMiddleware();
@@ -79,14 +88,12 @@ export class App {
       sampleController,
       validationMiddleware,
     );
-
     const authRouter = new AuthRouter(authController, validationMiddleware);
     const userRouter = new UserRouter(
       userController,
       validationMiddleware,
       uploaderMiddleware,
     );
-
     const outletRouter = new OutletRouter(
       outletController,
       validationMiddleware,
@@ -95,13 +102,19 @@ export class App {
       laundryItemController,
       validationMiddleware,
     );
+    const employeeRouter = new EmployeeRouter(
+      employeeController,
+      validationMiddleware,
+    );
+    const shiftRouter = new ShiftRouter(shiftController, validationMiddleware);
 
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/auth", authRouter.getRouter());
     this.app.use("/users", userRouter.getRouter());
-    this.app.use("/outlet", outletRouter.getRouter());
     this.app.use("/outlets", outletRouter.getRouter());
     this.app.use("/laundry-items", laundryItemRouter.getRouter());
+    this.app.use("/employees", employeeRouter.getRouter());
+    this.app.use("/shifts", shiftRouter.getRouter());
   }
 
   private handleError() {
