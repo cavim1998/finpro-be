@@ -7,6 +7,9 @@ import { UserController } from "./user.controller.js";
 import { UpdateProfileDTO } from "./dto/update-profile.dto.js";
 import { ChangePasswordDTO } from "./dto/change-password.dto.js";
 import { UpdateEmailDTO } from "./dto/update-email.dto.js";
+import { CreateAddressDTO } from "./dto/create-address.dto.js";
+import { UpdateAddressDTO } from "./dto/update-address.dto.js";
+import { SetPrimaryAddressDTO } from "./dto/set-primary-address.dto.js";
 
 export class UserRouter {
   private router: Router;
@@ -29,6 +32,58 @@ export class UserRouter {
       "/profile",
       verifyToken(JWT_SECRET),
       this.userController.getProfile,
+    );
+
+    /**
+     * =========================
+     * ADDRESS MANAGEMENT ROUTES
+     * (MUST be before /:id route to avoid conflicts)
+     * =========================
+     */
+
+    // Get all addresses
+    this.router.get(
+      "/addresses",
+      verifyToken(JWT_SECRET),
+      this.userController.getAddresses,
+    );
+
+    // Create new address
+    this.router.post(
+      "/addresses",
+      verifyToken(JWT_SECRET),
+      this.validationMiddleware.validateBody(CreateAddressDTO),
+      this.userController.createAddress,
+    );
+
+    // Update address
+    this.router.put(
+      "/addresses/:id",
+      verifyToken(JWT_SECRET),
+      this.validationMiddleware.validateBody(UpdateAddressDTO),
+      this.userController.updateAddress,
+    );
+
+    // Delete address
+    this.router.delete(
+      "/addresses/:id",
+      verifyToken(JWT_SECRET),
+      this.userController.deleteAddress,
+    );
+
+    // Set address as primary (PATCH version)
+    this.router.patch(
+      "/addresses/:id/set-primary",
+      verifyToken(JWT_SECRET),
+      this.validationMiddleware.validateBody(SetPrimaryAddressDTO),
+      this.userController.setPrimaryAddress,
+    );
+
+    // Set address as primary (PUT version - /primary endpoint)
+    this.router.put(
+      "/addresses/:id/primary",
+      verifyToken(JWT_SECRET),
+      this.userController.setPrimaryAddress,
     );
 
     // Get user by ID

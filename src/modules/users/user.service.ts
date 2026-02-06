@@ -7,6 +7,8 @@ import { ApiError } from "../../utils/api-error.js";
 import { UpdateProfileDTO } from "./dto/update-profile.dto.js";
 import { ChangePasswordDTO } from "./dto/change-password.dto.js";
 import { UpdateEmailDTO } from "./dto/update-email.dto.js";
+import { CreateAddressDTO } from "./dto/create-address.dto.js";
+import { UpdateAddressDTO } from "./dto/update-address.dto.js";
 
 export class UserService {
   constructor(
@@ -358,5 +360,200 @@ export class UserService {
         expiresAt,
       },
     };
+  };
+
+  /**
+   * =========================
+   * USER ADDRESS MANAGEMENT
+   * =========================
+   */
+
+  getAddresses = async (userId: string) => {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) throw new ApiError("User not found", 404, "USER_NOT_FOUND");
+
+    const addresses = await this.prisma.userAddress.findMany({
+      where: { userId },
+      orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+    });
+
+    return addresses;
+  };
+
+  createAddress = async (userId: string, data: CreateAddressDTO) => {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) throw new ApiError("User not found", 404, "USER_NOT_FOUND");
+
+    // Jika isPrimary true dan user sudah punya address primary, set yang lama menjadi false
+    if (data.isPrimary) {
+      await this.prisma.userAddress.updateMany({
+        where: { userId, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+
+    // Jika user belum punya address, set ini sebagai primary
+    const existingAddresses = await this.prisma.userAddress.findMany({
+      where: { userId },
+    });
+
+    const newAddress = await this.prisma.userAddress.create({
+      data: {
+        userId,
+        label: data.label,
+        receiverName: data.receiverName,
+        receiverPhone: data.receiverPhone,
+        addressText: data.addressText,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        isPrimary: data.isPrimary || existingAddresses.length === 0, // Default true jika address pertama
+      },
+    });
+
+    return newAddress;
+  };
+
+  updateAddress = async (
+    userId: string,
+    addressId: number,
+    data: UpdateAddressDTO,
+  ) => {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) throw new ApiError("User not found", 404, "USER_NOT_FOUND");
+
+    // Validasi ownership
+    const address = await this.prisma.userAddress.findUnique({
+      where: { id: addressId },
+    });
+
+    if (!address) {
+      throw new ApiError("Address not found", 404, "ADDRESS_NOT_FOUND");
+    }
+
+    if (address.userId !== userId) {
+      throw new ApiError(
+        "Unauthorized to update this address",
+        403,
+        "FORBIDDEN",
+      );
+    }
+
+    // Jika ingin set sebagai primary
+    if (data.isPrimary) {
+      await this.prisma.userAddress.updateMany({
+        where: { userId, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+
+    const updatedAddress = await this.prisma.userAddress.update({
+      where: { id: addressId },
+      data: {
+        label: data.label ?? address.label,
+        receiverName: data.receiverName ?? address.receiverName,
+        receiverPhone: data.receiverPhone ?? address.receiverPhone,
+        addressText: data.addressText ?? address.addressText,
+        latitude: data.latitude ?? address.latitude,
+        longitude: data.longitude ?? address.longitude,
+        isPrimary: data.isPrimary ?? address.isPrimary,
+      },
+    });
+
+    return updatedAddress;
+  };
+
+  deleteAddress = async (userId: string, addressId: number) => {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) throw new ApiError("User not found", 404, "USER_NOT_FOUND");
+
+    const address = await this.prisma.userAddress.findUnique({
+      where: { id: addressId },
+    });
+
+    if (!address) {
+      throw new ApiError("Address not found", 404, "ADDRESS_NOT_FOUND");
+    }
+
+    if (address.userId !== userId) {
+      throw new ApiError(
+        "Unauthorized to delete this address",
+        403,
+        "FORBIDDEN",
+      );
+    }
+
+    await this.prisma.userAddress.delete({
+      where: { id: addressId },
+    });
+
+    // Jika address yang dihapus adalah primary, set address lain sebagai primary
+    if (address.isPrimary) {
+      const otherAddress = await this.prisma.userAddress.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "asc" },
+      });
+
+      if (otherAddress) {
+        await this.prisma.userAddress.update({
+          where: { id: otherAddress.id },
+          data: { isPrimary: true },
+        });
+      }
+    }
+
+    return {
+      status: "success",
+      message: "Address deleted successfully",
+    };
+  };
+
+  setPrimaryAddress = async (userId: string, addressId: number) => {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) throw new ApiError("User not found", 404, "USER_NOT_FOUND");
+
+    const address = await this.prisma.userAddress.findUnique({
+      where: { id: addressId },
+    });
+
+    if (!address) {
+      throw new ApiError("Address not found", 404, "ADDRESS_NOT_FOUND");
+    }
+
+    if (address.userId !== userId) {
+      throw new ApiError(
+        "Unauthorized to update this address",
+        403,
+        "FORBIDDEN",
+      );
+    }
+
+    // Set semua address user menjadi false
+    await this.prisma.userAddress.updateMany({
+      where: { userId },
+      data: { isPrimary: false },
+    });
+
+    // Set address yang dipilih menjadi primary
+    const updatedAddress = await this.prisma.userAddress.update({
+      where: { id: addressId },
+      data: { isPrimary: true },
+    });
+
+    return updatedAddress;
   };
 }

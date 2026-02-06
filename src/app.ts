@@ -24,6 +24,9 @@ import { OutletController } from "./modules/outlet/outlet.controller.js";
 import { LaundryItemService } from "./modules/laundry-item/laundry-item.service.js";
 import { LaundryItemController } from "./modules/laundry-item/laundry-item.controller.js";
 import { LaundryItemRouter } from "./modules/laundry-item/laundry-item.router.js";
+import { AttendanceController } from "./modules/attendance/attendance.controller.js";
+import { AttendanceRouter } from "./modules/attendance/attendance.router.js";
+import { AttendanceService } from "./modules/attendance/attendance.service.js";
 import { EmployeeService } from "./modules/employee/employee.service.js";
 import { EmployeeController } from "./modules/employee/employee.controller.js";
 import { EmployeeRouter } from "./modules/employee/employee.router.js";
@@ -102,6 +105,13 @@ export class App {
       laundryItemController,
       validationMiddleware,
     );
+
+    const attendanceService = new AttendanceService(prismaClient);
+    const attendanceController = new AttendanceController(attendanceService);
+    const attendanceRouter = new AttendanceRouter(
+      attendanceController,
+      validationMiddleware,
+    );
     const employeeRouter = new EmployeeRouter(
       employeeController,
       validationMiddleware,
@@ -113,6 +123,7 @@ export class App {
     this.app.use("/users", userRouter.getRouter());
     this.app.use("/outlets", outletRouter.getRouter());
     this.app.use("/laundry-items", laundryItemRouter.getRouter());
+    this.app.use("/attendance", attendanceRouter.getRouter());
     this.app.use("/employees", employeeRouter.getRouter());
     this.app.use("/shifts", shiftRouter.getRouter());
   }
