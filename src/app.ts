@@ -37,6 +37,9 @@ import { ShiftService } from "./modules/shift/shift.service.js";
 import { UserController } from "./modules/users/user.controller.js";
 import { UserRouter } from "./modules/users/user.router.js";
 import { UserService } from "./modules/users/user.service.js";
+import { PickupRequestRouter } from "./modules/pickup-request/pickup-request.router.js";
+import { OrderRouter } from "./modules/order/order.router.js";
+import { PaymentRouter } from "./modules/payment/payment.router.js";
 
 export class App {
   app: Express;
@@ -128,6 +131,14 @@ export class App {
       validationMiddleware,
     );
 
+    // New routers for pickup order feature
+    const pickupRequestRouter = new PickupRequestRouter(
+      prismaClient,
+      validationMiddleware,
+    );
+    const orderRouter = new OrderRouter(prismaClient, validationMiddleware);
+    const paymentRouter = new PaymentRouter(prismaClient, validationMiddleware);
+
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/auth", authRouter.getRouter());
     this.app.use("/users", userRouter.getRouter());
@@ -136,6 +147,9 @@ export class App {
     this.app.use("/attendance", attendanceRouter.getRouter());
     this.app.use("/employees", employeeRouter.getRouter());
     this.app.use("/shifts", shiftRouter.getRouter());
+    this.app.use("/pickup-requests", pickupRequestRouter.getRouter());
+    this.app.use("/orders", orderRouter.getRouter());
+    this.app.use("/payments", paymentRouter.getRouter());
     this.app.use("/driver", verifyToken(JWT_SECRET), driverRouter.getRouter());
   }
 
