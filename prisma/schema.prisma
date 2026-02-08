@@ -79,6 +79,14 @@ enum OrderStatus {
   CANCELED
 }
 
+enum DriverTaskStatus {
+  AVAILABLE   // muncul di dashboard semua driver outlet itu
+  ASSIGNED    // sudah di-claim driver
+  PICKED_UP   // driver sudah ambil cucian
+  COMPLETED   // sudah antar ke outlet
+  CANCELED
+}
+
 enum TaskType {
   PICKUP
   DELIVERY
@@ -278,30 +286,30 @@ model Outlet {
  * =========================
  */
 
- model ShiftTemplate {
-  id        Int      @id @default(autoincrement())
-  outletId  Int
-  name      String
-  startTime DateTime @db.Time
-  endTime   DateTime @db.Time
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+model ShiftTemplate {
+  id            Int           @id @default(autoincrement())
+  outletId      Int
+  name          String
+  startTime     DateTime      @db.Time
+  endTime       DateTime      @db.Time
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  outlet        Outlet        @relation(fields: [outletId], references: [id], onDelete: Cascade)
   assignedStaff OutletStaff[]
 
   @@index([outletId])
 }
 
 model OutletStaff {
-  id            Int          @id @default(autoincrement())
-  outletId      Int
-  userId        Int
-  workerStation StationType?
-  shiftTemplateId Int?         
+  id              Int            @id @default(autoincrement())
+  outletId        Int
+  userId          Int
+  workerStation   StationType?
+  shiftTemplateId Int?
   shiftTemplate   ShiftTemplate? @relation(fields: [shiftTemplateId], references: [id])
-  isActive      Boolean      @default(true)
-  createdAt     DateTime     @default(now())
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
 
   outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -413,6 +421,9 @@ model Order {
   customerId             Int
   createdByOutletAdminId Int
 
+  customerLatitude  String?
+  customerLongitude String?
+
   totalWeightKg  Decimal @db.Decimal(10, 2)
   subtotalAmount Decimal @default(0) @db.Decimal(14, 2)
   deliveryFee    Decimal @default(0) @db.Decimal(14, 2)
@@ -474,7 +485,7 @@ model OrderStation {
   status           StationStatus @default(PENDING)
 
   order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  worker User?  @relation("OrderStationWorker", fields: [assignedWorkerId], references: [id], onDelete: SetNull)
+  worker User? @relation("OrderStationWorker", fields: [assignedWorkerId], references: [id], onDelete: SetNull)
 
   itemCounts     StationItemCount[]
   bypassRequests BypassRequest[]
