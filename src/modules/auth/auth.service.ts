@@ -45,7 +45,7 @@ export class AuthService {
 
   private buildAuthData = (
     user: {
-      id: string;
+      id: number;
       email: string | null;
       isEmailVerified: boolean;
       profile?: { fullName?: string | null; photoUrl?: string | null } | null;
@@ -67,7 +67,7 @@ export class AuthService {
 
   private buildAuthResponse = (
     user: {
-      id: string;
+      id: number;
       email: string | null;
       isEmailVerified: boolean;
       profile?: { fullName?: string | null; photoUrl?: string | null } | null;
