@@ -11,25 +11,19 @@ import { GetOrdersDTO } from "./dto/get-orders.dto.js";
 export class OrderService {
   constructor(private prisma: PrismaClient) {}
 
-  private async generateOrderNumber(): Promise<string> {
+  private generateOrderNumber(): string {
     const today = new Date();
     const dateStr = today.toISOString().split("T")[0].replace(/-/g, ""); // YYYYMMDD
+    const timeStr = today
+      .toISOString()
+      .split("T")[1]
+      .substring(0, 6)
+      .replace(/:/g, ""); // HHMMSS
+    const random = Math.floor(Math.random() * 100000)
+      .toString()
+      .padStart(5, "0");
 
-    // Get count of orders today
-    const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(today.setHours(23, 59, 59, 999));
-
-    const count = await this.prisma.order.count({
-      where: {
-        createdAt: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
-      },
-    });
-
-    const sequence = (count + 1).toString().padStart(5, "0");
-    return `INV-${dateStr}-${sequence}`;
+    return `INV-${dateStr}-${timeStr}-${random}`;
   }
 
   async createOrder(dto: CreateOrderDTO, outletAdminId: number) {
@@ -86,11 +80,11 @@ export class OrderService {
     const paymentDueAt = new Date();
     paymentDueAt.setDate(paymentDueAt.getDate() + 3); // 2.5 days + buffer
 
-    // 5. Generate order number
-    const orderNo = await this.generateOrderNumber();
-
-    // 6. Create order with transaction
+    // 5. Create order with transaction
     const order = await this.prisma.$transaction(async (tx) => {
+      // Generate order number inside transaction
+      const orderNo = this.generateOrderNumber();
+
       // Create order
       const newOrder = await tx.order.create({
         data: {
@@ -225,6 +219,7 @@ export class OrderService {
     return {
       data: orders.map((order) => ({
         ...order,
+        deliveryDate: order.deliveredAt, // Alias for FE requirement
         isPaid: order.payments.length > 0,
         itemCount: order.items.reduce((sum, item) => sum + item.qty, 0),
       })),
@@ -307,6 +302,7 @@ export class OrderService {
 
     return {
       ...order,
+      deliveryDate: order.deliveredAt, // Alias for FE requirement
       isPaid: order.payments.some((p) => p.status === "PAID"),
       itemCount: order.items.reduce((sum, item) => sum + item.qty, 0),
     };
@@ -321,8 +317,9 @@ export class OrderService {
       throw new ApiError("Order tidak ditemukan", 404);
     }
 
-    if (order.status !== OrderStatus.RECEIVED_BY_CUSTOMER) {
-      throw new ApiError("Order belum diterima customer", 400);
+    // Customer only can confirm when order is being delivered
+    if (order.status !== OrderStatus.DELIVERING_TO_CUSTOMER) {
+      throw new ApiError("Order belum dalam status pengiriman", 400);
     }
 
     if (order.receivedConfirmedAt) {
@@ -332,6 +329,7 @@ export class OrderService {
     const updatedOrder = await this.prisma.order.update({
       where: { id: orderId },
       data: {
+        status: OrderStatus.RECEIVED_BY_CUSTOMER,
         receivedConfirmedAt: new Date(),
       },
       include: {
@@ -356,7 +354,7 @@ export class OrderService {
 
     const ordersToConfirm = await this.prisma.order.findMany({
       where: {
-        status: OrderStatus.RECEIVED_BY_CUSTOMER,
+        status: OrderStatus.DELIVERING_TO_CUSTOMER,
         deliveredAt: {
           not: null,
           lte: twoDaysAgo,
@@ -376,6 +374,7 @@ export class OrderService {
         },
       },
       data: {
+        status: OrderStatus.RECEIVED_BY_CUSTOMER,
         receivedConfirmedAt: new Date(),
       },
     });

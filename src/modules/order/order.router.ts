@@ -39,8 +39,8 @@ export class OrderRouter {
       this.orderController.getOrderById,
     );
 
-    this.router.post(
-      "/:id/confirm",
+    this.router.patch(
+      "/:id",
       verifyToken(JWT_SECRET),
       this.orderController.confirmOrder,
     );

@@ -259,15 +259,17 @@ model UserAddress {
 }
 
 model Outlet {
-  id              Int      @id @default(autoincrement())
-  name            String
-  addressText     String
-  latitude        Decimal? @db.Decimal(10, 7)
-  longitude       Decimal? @db.Decimal(10, 7)
-  serviceRadiusKm Decimal  @default(5.00) @db.Decimal(6, 2)
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                 Int      @id @default(autoincrement())
+  name               String
+  addressText        String
+  latitude           Decimal? @db.Decimal(10, 7)
+  longitude          Decimal? @db.Decimal(10, 7)
+  serviceRadiusKm    Decimal  @default(5.00) @db.Decimal(6, 2)
+  photoUrl           String?  @db.VarChar(500)
+  location_category  String?  @db.VarChar(100)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   staff          OutletStaff[]
   shifts         Shift[]
