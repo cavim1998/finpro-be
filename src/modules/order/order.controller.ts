@@ -69,6 +69,15 @@ export class OrderController {
 
       const { id } = req.params;
 
+      // Optional: validate status from body if provided
+      const { status } = req.body || {};
+      if (status && status !== "RECEIVED_BY_CUSTOMER") {
+        throw new ApiError(
+          "Invalid status. Only RECEIVED_BY_CUSTOMER is allowed",
+          400,
+        );
+      }
+
       const result = await this.orderService.confirmOrderReceived(
         id,
         customerId,
