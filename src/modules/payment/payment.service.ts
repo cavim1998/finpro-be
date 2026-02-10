@@ -3,11 +3,52 @@ import {
   OrderStatus,
   PaymentStatus,
 } from "../../../generated/prisma/client.js";
+import crypto from "crypto";
 import { ApiError } from "../../utils/api-error.js";
 import { CreatePaymentDTO } from "./dto/create-payment.dto.js";
+import {
+  FE_URL,
+  MIDTRANS_IS_PRODUCTION,
+  MIDTRANS_MERCHANT_ID,
+  MIDTRANS_SERVER_KEY,
+} from "../../config/env.js";
 
 export class PaymentService {
   constructor(private prisma: PrismaClient) {}
+
+  private getMidtransBaseUrl() {
+    return MIDTRANS_IS_PRODUCTION
+      ? "https://app.midtrans.com"
+      : "https://app.sandbox.midtrans.com";
+  }
+
+  private async createMidtransSnap(payload: unknown) {
+    const url = `${this.getMidtransBaseUrl()}/snap/v1/transactions`;
+    const auth = Buffer.from(`${MIDTRANS_SERVER_KEY}:`).toString("base64");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: `Basic ${auth}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new ApiError("Gagal membuat transaksi Midtrans", 502, "MIDTRANS", {
+        status: response.status,
+        body: errorText,
+      });
+    }
+
+    return (await response.json()) as {
+      token: string;
+      redirect_url: string;
+    };
+  }
 
   async createPayment(dto: CreatePaymentDTO, customerId: number) {
     // 1. Validate order exists and belongs to customer
@@ -15,6 +56,11 @@ export class PaymentService {
       where: { id: dto.orderId, customerId },
       include: {
         payments: true,
+        items: {
+          include: {
+            item: true,
+          },
+        },
         customer: {
           select: {
             id: true,
@@ -55,67 +101,120 @@ export class PaymentService {
       throw new ApiError("Order sudah dibayar", 400);
     }
 
+    const existingPendingPayment = order.payments.find(
+      (p) => p.status === PaymentStatus.PENDING,
+    );
+    if (existingPendingPayment) {
+      throw new ApiError("Masih ada pembayaran yang pending", 400);
+    }
+
     // 4. Check payment deadline
     if (order.paymentDueAt && new Date() > order.paymentDueAt) {
       throw new ApiError("Batas waktu pembayaran telah lewat", 400);
     }
 
     // 5. Create payment with mock gateway integration
-    // In production, integrate with actual QRIS gateway
-    const gatewayRef = `${dto.provider.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    const grossAmount = Math.max(1, Math.round(Number(order.totalAmount)));
+    const paymentAttempt = order.payments.length + 1;
+    const gatewayRef =
+      paymentAttempt > 1 ? `${order.orderNo}-${paymentAttempt}` : order.orderNo;
+    const customerName = order.customer.profile?.fullName || "Customer";
 
-    // Mock payment gateway response
-    const mockGatewayResponse = {
-      snapToken: `SNAP-${gatewayRef}`,
-      paymentUrl: `https://app.${dto.provider}.com/payment/${gatewayRef}`,
-      expiresAt:
-        order.paymentDueAt || new Date(Date.now() + 24 * 60 * 60 * 1000),
+    const itemDetails = order.items.map((orderItem) => ({
+      id: String(orderItem.itemId),
+      name: orderItem.item.name,
+      quantity: orderItem.qty,
+      price: Math.max(1, Math.round(Number(orderItem.item.price))),
+    }));
+
+    if (Number(order.deliveryFee) > 0) {
+      itemDetails.push({
+        id: "DELIVERY_FEE",
+        name: "Delivery Fee",
+        quantity: 1,
+        price: Math.max(1, Math.round(Number(order.deliveryFee))),
+      });
+    }
+
+    const midtransPayload = {
+      transaction_details: {
+        order_id: gatewayRef,
+        gross_amount: grossAmount,
+      },
+      customer_details: {
+        first_name: customerName,
+        email: order.customer.email || undefined,
+        phone: order.customer.profile?.phone || undefined,
+      },
+      item_details: itemDetails,
+      credit_card: {
+        secure: true,
+      },
+      custom_field1: order.id,
+      custom_field2: String(order.customerId),
+      callbacks: {
+        finish: `${FE_URL}/payments/finish?orderId=${order.id}`,
+      },
     };
+
+    const snapResponse = await this.createMidtransSnap(midtransPayload);
 
     const payment = await this.prisma.payment.create({
       data: {
         orderId: dto.orderId,
-        provider: dto.provider,
+        provider: "midtrans",
         amount: order.totalAmount,
         status: PaymentStatus.PENDING,
         gatewayRef,
-        payloadJson: mockGatewayResponse,
-      },
-    });
-
-    // TODO: In production, call actual QRIS gateway API
-
-    return {
-      ...payment,
-      snapToken: mockGatewayResponse.snapToken,
-      paymentUrl: mockGatewayResponse.paymentUrl,
-      expiresAt: mockGatewayResponse.expiresAt,
-    };
-  }
-
-  async handlePaymentWebhook(webhookData: any) {
-    // In production, verify signature from payment gateway
-    const { order_id, transaction_status, transaction_id } = webhookData;
-
-    // Find order by orderNo
-    const order = await this.prisma.order.findFirst({
-      where: { orderNo: order_id },
-      include: {
-        payments: {
-          where: { status: PaymentStatus.PENDING },
-          orderBy: { createdAt: "desc" },
+        payloadJson: {
+          midtrans: snapResponse,
+          merchantId: MIDTRANS_MERCHANT_ID,
         },
       },
     });
 
-    if (!order) {
-      throw new ApiError("Order tidak ditemukan", 404);
+    return {
+      ...payment,
+      snapToken: snapResponse.token,
+      paymentUrl: snapResponse.redirect_url,
+      expiresAt:
+        order.paymentDueAt || new Date(Date.now() + 24 * 60 * 60 * 1000),
+    };
+  }
+
+  async handlePaymentWebhook(webhookData: any) {
+    const {
+      order_id,
+      transaction_status,
+      transaction_id,
+      status_code,
+      gross_amount,
+      signature_key,
+    } = webhookData;
+
+    if (signature_key && status_code && gross_amount && order_id) {
+      const signaturePayload = `${order_id}${status_code}${gross_amount}${MIDTRANS_SERVER_KEY}`;
+      const expectedSignature = crypto
+        .createHash("sha512")
+        .update(signaturePayload)
+        .digest("hex");
+
+      if (signature_key !== expectedSignature) {
+        throw new ApiError("Signature Midtrans tidak valid", 401);
+      }
     }
 
-    const payment = order.payments[0];
-    if (!payment) {
+    // Find order by orderNo
+    const payment = await this.prisma.payment.findUnique({
+      where: { gatewayRef: order_id },
+      include: { order: true },
+    });
+
+    if (!payment || !payment.order) {
       throw new ApiError("Payment tidak ditemukan", 404);
     }
+
+    const order = payment.order;
 
     // Handle payment status based on gateway response
     let paymentStatus: PaymentStatus;
@@ -133,8 +232,10 @@ export class PaymentService {
         break;
       case "deny":
       case "cancel":
-      case "expire":
         paymentStatus = PaymentStatus.FAILED;
+        break;
+      case "expire":
+        paymentStatus = PaymentStatus.EXPIRED;
         break;
       default:
         paymentStatus = PaymentStatus.PENDING;
@@ -180,7 +281,11 @@ export class PaymentService {
 
     // TODO: Send notification to customer and drivers
 
-    return { success: true, paymentStatus, orderStatus: order.status };
+    const orderStatus = orderNeedsUpdate
+      ? OrderStatus.READY_TO_DELIVER
+      : order.status;
+
+    return { success: true, paymentStatus, orderStatus };
   }
 
   async getPaymentsByOrder(orderId: string, customerId: number) {
@@ -197,7 +302,14 @@ export class PaymentService {
       orderBy: { createdAt: "desc" },
     });
 
-    return payments;
+    return payments.map((payment) => {
+      const payload = payment.payloadJson as any;
+      return {
+        ...payment,
+        snapToken: payload?.midtrans?.token,
+        paymentUrl: payload?.midtrans?.redirect_url,
+      };
+    });
   }
 
   // Upload payment proof image (QRIS receipt)
@@ -241,7 +353,7 @@ export class PaymentService {
       const updatePayment = await tx.payment.update({
         where: { id: paymentId },
         data: {
-          proofUrl,
+          // proofUrl,
           status: PaymentStatus.PAID,
           paidAt: new Date(),
         },
