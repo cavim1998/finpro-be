@@ -27,7 +27,6 @@ export class AttendanceService {
       throw new ApiError("Outlet staff not found for this user", 404);
     }
 
-    // sesuai keputusan D1 + user hanya 1 outlet
     if (staffList.length > 1) {
       throw new ApiError(
         "User is assigned to more than 1 outlet. Please fix outletStaff data.",
