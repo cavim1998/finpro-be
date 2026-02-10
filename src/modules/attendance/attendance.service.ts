@@ -10,7 +10,7 @@ export class AttendanceService {
     // en-CA => YYYY-MM-DD
     return new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
   };
-
+  //hello world
   private getTodayDate = (timeZone = DEFAULT_TZ) => {
     const key = this.getDateKeyToday(timeZone); // YYYY-MM-DD
     const [y, m, d] = key.split("-").map(Number);
@@ -27,7 +27,6 @@ export class AttendanceService {
       throw new ApiError("Outlet staff not found for this user", 404);
     }
 
-    // sesuai keputusan D1 + user hanya 1 outlet
     if (staffList.length > 1) {
       throw new ApiError(
         "User is assigned to more than 1 outlet. Please fix outletStaff data.",
