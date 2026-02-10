@@ -10,7 +10,7 @@ export class AttendanceService {
     // en-CA => YYYY-MM-DD
     return new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
   };
-
+  //hello world
   private getTodayDate = (timeZone = DEFAULT_TZ) => {
     const key = this.getDateKeyToday(timeZone); // YYYY-MM-DD
     const [y, m, d] = key.split("-").map(Number);
