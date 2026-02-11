@@ -161,6 +161,7 @@ export class AuthService {
       where: { email: data.email },
       include: {
         profile: true,
+        outletStaff: true,
       },
     });
 
@@ -206,7 +207,13 @@ export class AuthService {
     }
 
     const token = jwt.sign(
-      { sub: user.id, email: user.email, role: user.role },
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        outletId:
+          user.outletStaff.length !== 0 ? user.outletStaff[0].outletId : 0,
+      },
       JWT_SECRET,
       {
         expiresIn: "2h",

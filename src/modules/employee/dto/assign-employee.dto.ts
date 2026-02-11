@@ -2,7 +2,7 @@ import { IsString, IsNotEmpty, IsEnum, IsNumber } from "class-validator";
 import { RoleCode } from "../../../../generated/prisma/client.js";
 
 export class AssignEmployeeDTO {
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
   userId!: string;
 

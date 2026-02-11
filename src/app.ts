@@ -33,6 +33,12 @@ import { EmployeeRouter } from "./modules/employee/employee.router.js";
 import { ShiftService } from "./modules/shift/shift.service.js";
 import { ShiftController } from "./modules/shift/shift.controller.js";
 import { ShiftRouter } from "./modules/shift/shift.router.js";
+import { OrderService } from "./modules/order/order.service.js";
+import { OrderController } from "./modules/order/order.controller.js";
+import { OrderRouter } from "./modules/order/order.router.js";
+import { PickupService } from "./modules/pickup/pickup.service.js";
+import { PickupController } from "./modules/pickup/pickup.controller.js";
+import { PickupRouter } from "./modules/pickup/pickup.router.js";
 
 export class App {
   app: Express;
@@ -72,6 +78,8 @@ export class App {
     const laundryItemService = new LaundryItemService(prismaClient);
     const employeeService = new EmployeeService(prismaClient);
     const shiftService = new ShiftService(prismaClient);
+    const orderService = new OrderService(prismaClient);
+    const pickupService = new PickupService(prismaClient);
 
     // controllers
     const sampleController = new SampleController(sampleService);
@@ -81,6 +89,8 @@ export class App {
     const laundryItemController = new LaundryItemController(laundryItemService);
     const employeeController = new EmployeeController(employeeService);
     const shiftController = new ShiftController(shiftService);
+    const orderController = new OrderController(orderService);
+    const pickupController = new PickupController(pickupService);
 
     // middlewares
     const validationMiddleware = new ValidationMiddleware();
@@ -117,6 +127,8 @@ export class App {
       validationMiddleware,
     );
     const shiftRouter = new ShiftRouter(shiftController, validationMiddleware);
+    const orderRouter = new OrderRouter(orderController, validationMiddleware);
+    const pickupRouter = new PickupRouter(pickupController);
 
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/auth", authRouter.getRouter());
@@ -126,6 +138,8 @@ export class App {
     this.app.use("/attendance", attendanceRouter.getRouter());
     this.app.use("/employees", employeeRouter.getRouter());
     this.app.use("/shifts", shiftRouter.getRouter());
+    this.app.use("/orders", orderRouter.getRouter());
+    this.app.use("/pickup-requests", pickupRouter.getRouter());
   }
 
   private handleError() {

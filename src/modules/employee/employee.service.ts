@@ -52,7 +52,7 @@ export class EmployeeService {
   };
 
   assignEmployee = async (data: {
-    userId: string;
+    userId: number;
     outletId: number;
     role: any;
     shiftTemplateId: string;
@@ -125,7 +125,7 @@ export class EmployeeService {
     });
   };
 
-  unassignEmployee = async (userId: string) => {
+  unassignEmployee = async (userId: number) => {
     const staffRecord = await this.prisma.outletStaff.findFirst({
       where: { userId, isActive: true },
     });

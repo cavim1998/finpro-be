@@ -30,7 +30,7 @@ export class EmployeeController {
 
   unassign = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const result = await this.employeeService.unassignEmployee(id);
+    const result = await this.employeeService.unassignEmployee(Number(id));
     res.status(200).send(result);
   };
 }

@@ -132,6 +132,11 @@ enum ShiftAssignmentStatus {
   OFF_DUTY
 }
 
+enum ServiceType {
+  REGULAR
+  PREMIUM
+}
+
 /**
  * =========================
  * USERS & AUTH
@@ -412,6 +417,7 @@ model Order {
   outletId               Int
   customerId             Int
   createdByOutletAdminId Int
+  serviceType ServiceType @default(REGULAR)
 
   totalWeightKg  Decimal @db.Decimal(10, 2)
   subtotalAmount Decimal @default(0) @db.Decimal(14, 2)
@@ -449,6 +455,7 @@ model OrderItem {
   orderId   String   @db.Uuid
   itemId    Int
   qty       Int
+  price     Decimal  @db.Decimal(10, 2)
   createdAt DateTime @default(now())
 
   order Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
