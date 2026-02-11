@@ -44,6 +44,9 @@ import { PickupService } from "./modules/pickup/pickup.service.js";
 import { PickupController } from "./modules/pickup/pickup.controller.js";
 import { PickupRouter } from "./modules/pickup/pickup.router.js";
 import { PaymentRouter } from "./modules/payment/payment.router.js";
+import { WorkerController } from "./modules/worker/worker.controller.js";
+import { WorkerRouter } from "./modules/worker/worker.router.js";
+import { WorkerService } from "./modules/worker/worker.service.js";
 
 export class App {
   app: Express;
@@ -143,6 +146,9 @@ export class App {
     const pickupRouter = new PickupRouter(pickupController);
     const orderRouter = new OrderRouter(orderController, validationMiddleware);
     const paymentRouter = new PaymentRouter(prismaClient, validationMiddleware);
+    const workerService = new WorkerService();
+    const workerController = new WorkerController(workerService);
+    const workerRouter = new WorkerRouter(validationMiddleware);
 
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/auth", authRouter.getRouter());
@@ -156,6 +162,7 @@ export class App {
     this.app.use("/orders", orderRouter.getRouter());
     this.app.use("/payments", paymentRouter.getRouter());
     this.app.use("/driver", verifyToken(JWT_SECRET), driverRouter.getRouter());
+    this.app.use("/worker", workerRouter.getRouter());
   }
 
   private handleError() {
