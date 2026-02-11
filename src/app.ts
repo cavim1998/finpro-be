@@ -47,6 +47,9 @@ import { PaymentRouter } from "./modules/payment/payment.router.js";
 import { WorkerController } from "./modules/worker/worker.controller.js";
 import { WorkerRouter } from "./modules/worker/worker.router.js";
 import { WorkerService } from "./modules/worker/worker.service.js";
+import { PickupRequestService } from "./modules/pickup-request/pickup-request.service.js";
+import { PickupRequestController } from "./modules/pickup-request/pickup-request.controller.js";
+import { PickupRequestRouter } from "./modules/pickup-request/pickup-request.router.js";
 
 export class App {
   app: Express;
@@ -89,6 +92,7 @@ export class App {
     const driverService = new DriverService(prismaClient);
     const orderService = new OrderService(prismaClient);
     const pickupService = new PickupService(prismaClient);
+    const pickupRequestService = new PickupRequestService(prismaClient);
 
     // controllers
     const sampleController = new SampleController(sampleService);
@@ -101,6 +105,9 @@ export class App {
     const driverController = new DriverController(driverService);
     const orderController = new OrderController(orderService);
     const pickupController = new PickupController(pickupService);
+    const pickupRequestController = new PickupRequestController(
+      pickupRequestService,
+    );
 
     // middlewares
     const validationMiddleware = new ValidationMiddleware();
@@ -143,7 +150,10 @@ export class App {
     );
 
     // New routers for pickup order feature
-    const pickupRouter = new PickupRouter(pickupController);
+    const pickupRequestRouter = new PickupRequestRouter(
+      prismaClient,
+      validationMiddleware,
+    );
     const orderRouter = new OrderRouter(orderController, validationMiddleware);
     const paymentRouter = new PaymentRouter(prismaClient, validationMiddleware);
     const workerService = new WorkerService();
@@ -158,7 +168,7 @@ export class App {
     this.app.use("/attendance", attendanceRouter.getRouter());
     this.app.use("/employees", employeeRouter.getRouter());
     this.app.use("/shifts", shiftRouter.getRouter());
-    this.app.use("/pickup-requests", pickupRouter.getRouter());
+    this.app.use("/pickup-requests", pickupRequestRouter.getRouter());
     this.app.use("/orders", orderRouter.getRouter());
     this.app.use("/payments", paymentRouter.getRouter());
     this.app.use("/driver", verifyToken(JWT_SECRET), driverRouter.getRouter());
