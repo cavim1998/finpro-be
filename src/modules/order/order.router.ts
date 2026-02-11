@@ -31,12 +31,7 @@ export class OrderRouter {
     this.router.get(
       "/:id",
       verifyToken(JWT_SECRET),
-      authorizeRole([
-        RoleCode.OUTLET_ADMIN,
-        RoleCode.SUPER_ADMIN,
-        RoleCode.WORKER,
-      ]),
-      this.orderController.findOne,
+      this.orderController.getOrderById,
     );
 
     this.router.post(
@@ -45,6 +40,12 @@ export class OrderRouter {
       authorizeRole([RoleCode.OUTLET_ADMIN]),
       this.validationMiddleware.validateBody(CreateOrderDTO),
       this.orderController.create,
+    );
+
+    this.router.patch(
+      "/:id",
+      verifyToken(JWT_SECRET),
+      this.orderController.confirmOrder,
     );
   }
 

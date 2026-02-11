@@ -1,44 +1,49 @@
 import cors from "cors";
 import express, { Express } from "express";
 import "reflect-metadata";
-import { PORT } from "./config/env.js";
+import { JWT_SECRET, PORT } from "./config/env.js";
 import { loggerHttp } from "./lib/logger-http.js";
 import { prisma } from "./lib/prisma.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
+import { verifyToken } from "./middlewares/jwt.middleware.js";
 import { UploaderMiddleware } from "./middlewares/uploader.middleware.js";
 import { ValidationMiddleware } from "./middlewares/validation.middleware.js";
+import { AttendanceController } from "./modules/attendance/attendance.controller.js";
+import { AttendanceRouter } from "./modules/attendance/attendance.router.js";
+import { AttendanceService } from "./modules/attendance/attendance.service.js";
 import { AuthController } from "./modules/auth/auth.controller.js";
 import { AuthRouter } from "./modules/auth/auth.router.js";
 import { AuthService } from "./modules/auth/auth.service.js";
 import { CloudinaryService } from "./modules/cloudinary/cloudinary.service.js";
+import { DriverController } from "./modules/driver/driver.controller.js";
+import { DriverRouter } from "./modules/driver/driver.router.js";
+import { DriverService } from "./modules/driver/driver.service.js";
+import { EmployeeController } from "./modules/employee/employee.controller.js";
+import { EmployeeRouter } from "./modules/employee/employee.router.js";
+import { EmployeeService } from "./modules/employee/employee.service.js";
+import { LaundryItemController } from "./modules/laundry-item/laundry-item.controller.js";
+import { LaundryItemRouter } from "./modules/laundry-item/laundry-item.router.js";
+import { LaundryItemService } from "./modules/laundry-item/laundry-item.service.js";
 import { MailService } from "./modules/mail/mail.service.js";
+import { OutletController } from "./modules/outlet/outlet.controller.js";
+import { OutletRouter } from "./modules/outlet/outlet.router.js";
+import { OutletService } from "./modules/outlet/outlet.service.js";
 import { SampleController } from "./modules/sample/sample.controller.js";
 import { SampleRouter } from "./modules/sample/sample.router.js";
 import { SampleService } from "./modules/sample/sample.service.js";
+import { ShiftController } from "./modules/shift/shift.controller.js";
+import { ShiftRouter } from "./modules/shift/shift.router.js";
+import { ShiftService } from "./modules/shift/shift.service.js";
 import { UserController } from "./modules/users/user.controller.js";
 import { UserRouter } from "./modules/users/user.router.js";
 import { UserService } from "./modules/users/user.service.js";
-import { OutletRouter } from "./modules/outlet/outlet.router.js";
-import { OutletService } from "./modules/outlet/outlet.service.js";
-import { OutletController } from "./modules/outlet/outlet.controller.js";
-import { LaundryItemService } from "./modules/laundry-item/laundry-item.service.js";
-import { LaundryItemController } from "./modules/laundry-item/laundry-item.controller.js";
-import { LaundryItemRouter } from "./modules/laundry-item/laundry-item.router.js";
-import { AttendanceController } from "./modules/attendance/attendance.controller.js";
-import { AttendanceRouter } from "./modules/attendance/attendance.router.js";
-import { AttendanceService } from "./modules/attendance/attendance.service.js";
-import { EmployeeService } from "./modules/employee/employee.service.js";
-import { EmployeeController } from "./modules/employee/employee.controller.js";
-import { EmployeeRouter } from "./modules/employee/employee.router.js";
-import { ShiftService } from "./modules/shift/shift.service.js";
-import { ShiftController } from "./modules/shift/shift.controller.js";
-import { ShiftRouter } from "./modules/shift/shift.router.js";
 import { OrderService } from "./modules/order/order.service.js";
 import { OrderController } from "./modules/order/order.controller.js";
 import { OrderRouter } from "./modules/order/order.router.js";
 import { PickupService } from "./modules/pickup/pickup.service.js";
 import { PickupController } from "./modules/pickup/pickup.controller.js";
 import { PickupRouter } from "./modules/pickup/pickup.router.js";
+import { PaymentRouter } from "./modules/payment/payment.router.js";
 
 export class App {
   app: Express;
@@ -78,6 +83,7 @@ export class App {
     const laundryItemService = new LaundryItemService(prismaClient);
     const employeeService = new EmployeeService(prismaClient);
     const shiftService = new ShiftService(prismaClient);
+    const driverService = new DriverService(prismaClient);
     const orderService = new OrderService(prismaClient);
     const pickupService = new PickupService(prismaClient);
 
@@ -89,6 +95,7 @@ export class App {
     const laundryItemController = new LaundryItemController(laundryItemService);
     const employeeController = new EmployeeController(employeeService);
     const shiftController = new ShiftController(shiftService);
+    const driverController = new DriverController(driverService);
     const orderController = new OrderController(orderService);
     const pickupController = new PickupController(pickupService);
 
@@ -127,8 +134,15 @@ export class App {
       validationMiddleware,
     );
     const shiftRouter = new ShiftRouter(shiftController, validationMiddleware);
-    const orderRouter = new OrderRouter(orderController, validationMiddleware);
+    const driverRouter = new DriverRouter(
+      driverController,
+      validationMiddleware,
+    );
+
+    // New routers for pickup order feature
     const pickupRouter = new PickupRouter(pickupController);
+    const orderRouter = new OrderRouter(orderController, validationMiddleware);
+    const paymentRouter = new PaymentRouter(prismaClient, validationMiddleware);
 
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/auth", authRouter.getRouter());
@@ -138,8 +152,10 @@ export class App {
     this.app.use("/attendance", attendanceRouter.getRouter());
     this.app.use("/employees", employeeRouter.getRouter());
     this.app.use("/shifts", shiftRouter.getRouter());
-    this.app.use("/orders", orderRouter.getRouter());
     this.app.use("/pickup-requests", pickupRouter.getRouter());
+    this.app.use("/orders", orderRouter.getRouter());
+    this.app.use("/payments", paymentRouter.getRouter());
+    this.app.use("/driver", verifyToken(JWT_SECRET), driverRouter.getRouter());
   }
 
   private handleError() {

@@ -1,6 +1,7 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { OrderService } from "./order.service.js";
 import { OrderStatus, RoleCode } from "../../../generated/prisma/client.js";
+import { ApiError } from "../../utils/api-error.js";
 
 export class OrderController {
   constructor(private orderService: OrderService) {}
@@ -34,6 +35,9 @@ export class OrderController {
       const sortBy = (req.query.sortBy as string) || "createdAt";
       const sortOrder = (req.query.sortOrder as "asc" | "desc") || "desc";
       const status = req.query.status as OrderStatus | undefined;
+      const search = req.query.search as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
 
       let outletId: number | undefined;
 
@@ -58,6 +62,9 @@ export class OrderController {
         sortBy,
         sortOrder,
         status,
+        search,
+        startDate,
+        endDate,
       });
 
       res.send(result);
@@ -66,13 +73,53 @@ export class OrderController {
     }
   };
 
-  findOne = async (req: Request, res: Response) => {
+  getOrderById = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const id = req.params.id;
-      const order = await this.orderService.findOne(id);
-      res.send(order);
-    } catch (error: any) {
-      res.status(error.statusCode || 500).send({ error: error.message });
+      const authUser = res.locals.user as { sub?: string };
+      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
+      const customerId = parseInt(authUser.sub);
+
+      const { id } = req.params;
+
+      const result = await this.orderService.getOrderById(id, customerId);
+
+      res.status(200).json({
+        message: "Order detail berhasil diambil",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  confirmOrder = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authUser = res.locals.user as { sub?: string };
+      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
+      const customerId = parseInt(authUser.sub);
+
+      const { id } = req.params;
+
+      // Optional: validate status from body if provided
+      const { status } = req.body || {};
+      if (status && status !== "RECEIVED_BY_CUSTOMER") {
+        throw new ApiError(
+          "Invalid status. Only RECEIVED_BY_CUSTOMER is allowed",
+          400,
+        );
+      }
+
+      const result = await this.orderService.confirmOrderReceived(
+        id,
+        customerId,
+      );
+
+      res.status(200).json({
+        message: "Order berhasil dikonfirmasi",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
     }
   };
 }

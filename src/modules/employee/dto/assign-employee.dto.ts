@@ -1,10 +1,11 @@
-import { IsString, IsNotEmpty, IsEnum, IsNumber } from "class-validator";
+import { IsInt, IsNotEmpty, IsEnum, IsNumber } from "class-validator";
+import { Type } from "class-transformer";
 import { RoleCode } from "../../../../generated/prisma/client.js";
 
 export class AssignEmployeeDTO {
   @IsNumber()
   @IsNotEmpty()
-  userId!: string;
+  userId!: number;
 
   @IsNumber()
   @IsNotEmpty()
@@ -14,7 +15,8 @@ export class AssignEmployeeDTO {
   @IsNotEmpty()
   role!: RoleCode;
 
-  @IsString()
+  @Type(() => Number)
+  @IsInt()
   @IsNotEmpty()
-  shiftTemplateId!: string;
+  shiftTemplateId!: number;
 }

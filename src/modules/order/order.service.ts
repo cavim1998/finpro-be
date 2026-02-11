@@ -12,38 +12,37 @@ import { ApiError } from "../../utils/api-error.js";
 export class OrderService {
   constructor(private prisma: PrismaClient) {}
 
-  private async generateOrderNo(outletId: number): Promise<string> {
-    const date = new Date();
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const dd = String(date.getDate()).padStart(2, "0");
-    const prefix = `ORD-${yyyy}${mm}${dd}`;
+  private generateOrderNumber(): string {
+    const today = new Date();
+    const dateStr = today.toISOString().split("T")[0].replace(/-/g, ""); // YYYYMMDD
+    const timeStr = today
+      .toISOString()
+      .split("T")[1]
+      .substring(0, 6)
+      .replace(/:/g, ""); // HHMMSS
+    const random = Math.floor(Math.random() * 100000)
+      .toString()
+      .padStart(5, "0");
 
-    const lastOrder = await this.prisma.order.findFirst({
-      where: { orderNo: { startsWith: prefix } },
-      orderBy: { orderNo: "desc" },
-    });
-
-    const sequence = lastOrder
-      ? parseInt(lastOrder.orderNo.split("-")[2]) + 1
-      : 1;
-    return `${prefix}-${String(sequence).padStart(4, "0")}`;
+    return `INV-${dateStr}-${timeStr}-${random}`;
   }
 
   createOrder = async (data: CreateOrderDTO, adminId: string) => {
     return await this.prisma.$transaction(async (tx) => {
       const pickup = await tx.pickupRequest.findUnique({
         where: { id: data.pickupRequestId },
-        include: { address: true },
+        include: { address: true, order: true },
       });
 
       if (!pickup) throw new ApiError("Pickup Request tidak ditemukan", 404);
 
-      const existingOrder = await tx.order.findUnique({
-        where: { pickupRequestId: data.pickupRequestId },
-      });
-      if (existingOrder)
-        throw new ApiError("Order untuk pickup ini sudah dibuat", 400);
+      if (pickup.status !== PickupStatus.ARRIVED_OUTLET) {
+        throw new ApiError("Pickup request belum sampai di outlet", 400);
+      }
+
+      if (pickup.order) {
+        throw new ApiError("Order sudah dibuat untuk pickup request ini", 400);
+      }
 
       let subtotal = 0;
       const orderItemsData = [];
@@ -75,7 +74,10 @@ export class OrderService {
 
       const totalAmount = subtotal + premiumFee + deliveryFee;
 
-      const orderNo = await this.generateOrderNo(pickup.assignedOutletId);
+      const paymentDueAt = new Date();
+      paymentDueAt.setDate(paymentDueAt.getDate() + 3);
+
+      const orderNo = await this.generateOrderNumber();
 
       const newOrder = await tx.order.create({
         data: {
@@ -96,6 +98,7 @@ export class OrderService {
           items: {
             create: orderItemsData,
           },
+          paymentDueAt,
         },
       });
 
@@ -104,25 +107,21 @@ export class OrderService {
         data: { status: PickupStatus.ARRIVED_OUTLET },
       });
 
-      await tx.orderStation.createMany({
-        data: [
-          {
+      const stations = [
+        { stationType: StationType.WASHING },
+        { stationType: StationType.IRONING },
+        { stationType: StationType.PACKING },
+      ];
+
+      for (const station of stations) {
+        await tx.orderStation.create({
+          data: {
             orderId: newOrder.id,
-            stationType: StationType.WASHING,
-            status: StationStatus.PENDING,
+            stationType: station.stationType,
+            status: "PENDING",
           },
-          {
-            orderId: newOrder.id,
-            stationType: StationType.IRONING,
-            status: StationStatus.PENDING,
-          },
-          {
-            orderId: newOrder.id,
-            stationType: StationType.PACKING,
-            status: StationStatus.PENDING,
-          },
-        ],
-      });
+        });
+      }
 
       return newOrder;
     });
@@ -135,8 +134,21 @@ export class OrderService {
     sortBy: string;
     sortOrder: "asc" | "desc";
     status?: OrderStatus;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
   }) => {
-    const { outletId, page, limit, sortBy, sortOrder, status } = params;
+    const {
+      outletId,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      status,
+      search,
+      startDate,
+      endDate,
+    } = params;
 
     const skip = (page - 1) * limit;
 
@@ -150,12 +162,43 @@ export class OrderService {
       whereClause.orderStatus = status;
     }
 
+    if (search) {
+      whereClause.orderNo = { contains: search, mode: "insensitive" };
+    }
+
+    if (startDate || endDate) {
+      whereClause.createdAt = {};
+      if (startDate) {
+        whereClause.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        whereClause.createdAt.lte = new Date(endDate);
+      }
+    }
+
     const orders = await this.prisma.order.findMany({
       where: whereClause,
       include: {
         customer: { include: { profile: true } },
-        items: true,
-        outlet: true,
+        items: {
+          include: {
+            item: true,
+          },
+        },
+        outlet: {
+          select: {
+            id: true,
+            name: true,
+            addressText: true,
+          },
+        },
+        payments: {
+          where: { status: "PAID" },
+          select: {
+            id: true,
+            paidAt: true,
+          },
+        },
       },
       skip: skip,
       take: limit,
@@ -169,7 +212,12 @@ export class OrderService {
     });
 
     return {
-      data: orders,
+      data: orders.map((order) => ({
+        ...order,
+        deliveryDate: order.deliveredAt,
+        isPaid: order.payments.length > 0,
+        itemCount: order.items.reduce((sum, item) => sum + item.qty, 0),
+      })),
       meta: {
         total,
         page,
@@ -179,30 +227,81 @@ export class OrderService {
     };
   };
 
-  findOne = async (id: string) => {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
+  async getOrderById(orderId: string, customerId: number) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, customerId },
       include: {
-        customer: { include: { profile: true, addresses: true } },
-        pickupRequest: {
-          include: {
-            driverTasks: {
-              include: { driver: { include: { profile: true } } },
+        outlet: true,
+        customer: {
+          select: {
+            id: true,
+            email: true,
+            profile: {
+              select: {
+                fullName: true,
+                phone: true,
+              },
             },
           },
         },
-        items: { include: { item: true } },
+        items: {
+          include: {
+            item: true,
+          },
+        },
         stations: {
-          include: { worker: { include: { profile: true } } },
+          include: {
+            worker: {
+              select: {
+                id: true,
+                profile: {
+                  select: {
+                    fullName: true,
+                  },
+                },
+              },
+            },
+          },
           orderBy: { id: "asc" },
         },
-        payments: true,
+        payments: {
+          orderBy: { createdAt: "desc" },
+        },
+        pickupRequest: {
+          include: {
+            address: true,
+          },
+        },
+        driverTasks: {
+          include: {
+            driver: {
+              select: {
+                id: true,
+                profile: {
+                  select: {
+                    fullName: true,
+                    phone: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
       },
     });
 
-    if (!order) throw new ApiError("Order not found", 404);
-    return order;
-  };
+    if (!order) {
+      throw new ApiError("Order tidak ditemukan", 404);
+    }
+
+    return {
+      ...order,
+      deliveryDate: order.deliveredAt, // Alias for FE requirement
+      isPaid: order.payments.some((p) => p.status === "PAID"),
+      itemCount: order.items.reduce((sum, item) => sum + item.qty, 0),
+    };
+  }
 
   updateStatus = async (orderId: string, newStatus: OrderStatus) => {
     const order = await this.prisma.order.findUnique({
@@ -215,4 +314,80 @@ export class OrderService {
       data: { status: newStatus },
     });
   };
+
+  async confirmOrderReceived(orderId: string, customerId: number) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, customerId },
+    });
+
+    if (!order) {
+      throw new ApiError("Order tidak ditemukan", 404);
+    }
+
+    // Customer only can confirm when order is being delivered
+    if (order.status !== OrderStatus.DELIVERING_TO_CUSTOMER) {
+      throw new ApiError("Order belum dalam status pengiriman", 400);
+    }
+
+    if (order.receivedConfirmedAt) {
+      throw new ApiError("Order sudah dikonfirmasi sebelumnya", 400);
+    }
+
+    const updatedOrder = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.RECEIVED_BY_CUSTOMER,
+        receivedConfirmedAt: new Date(),
+      },
+      include: {
+        outlet: true,
+        items: {
+          include: {
+            item: true,
+          },
+        },
+      },
+    });
+
+    // TODO: Send notification about confirmation
+
+    return updatedOrder;
+  }
+
+  async autoConfirmOrders() {
+    // Find orders that need auto-confirmation (48 hours after delivery)
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setHours(twoDaysAgo.getHours() - 48);
+
+    const ordersToConfirm = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.DELIVERING_TO_CUSTOMER,
+        deliveredAt: {
+          not: null,
+          lte: twoDaysAgo,
+        },
+        receivedConfirmedAt: null,
+      },
+    });
+
+    if (ordersToConfirm.length === 0) {
+      return { count: 0 };
+    }
+
+    await this.prisma.order.updateMany({
+      where: {
+        id: {
+          in: ordersToConfirm.map((o) => o.id),
+        },
+      },
+      data: {
+        status: OrderStatus.RECEIVED_BY_CUSTOMER,
+        receivedConfirmedAt: new Date(),
+      },
+    });
+
+    // TODO: Send notifications to customers
+
+    return { count: ordersToConfirm.length };
+  }
 }

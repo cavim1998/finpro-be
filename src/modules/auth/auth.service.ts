@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { randomBytes } from "crypto";
 import { OAuth2Client } from "google-auth-library";
-import { PrismaClient } from "../../../generated/prisma/client.js";
+import { PrismaClient, RoleCode } from "../../../generated/prisma/client.js";
 import { FE_URL, GOOGLE_CLIENT_ID, JWT_SECRET } from "../../config/env.js";
 import { ApiError } from "../../utils/api-error.js";
 import { comparePassword, hashPassword } from "../../utils/password.js";
@@ -45,8 +45,9 @@ export class AuthService {
 
   private buildAuthData = (
     user: {
-      id: string;
+      id: number;
       email: string | null;
+      role: RoleCode;
       isEmailVerified: boolean;
       profile?: { fullName?: string | null; photoUrl?: string | null } | null;
     },
@@ -67,8 +68,9 @@ export class AuthService {
 
   private buildAuthResponse = (
     user: {
-      id: string;
+      id: number;
       email: string | null;
+      role: RoleCode;
       isEmailVerified: boolean;
       profile?: { fullName?: string | null; photoUrl?: string | null } | null;
     },

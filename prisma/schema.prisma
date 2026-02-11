@@ -79,6 +79,14 @@ enum OrderStatus {
   CANCELED
 }
 
+enum DriverTaskStatus {
+  AVAILABLE   // muncul di dashboard semua driver outlet itu
+  ASSIGNED    // sudah di-claim driver
+  PICKED_UP   // driver sudah ambil cucian
+  COMPLETED   // sudah antar ke outlet
+  CANCELED
+}
+
 enum TaskType {
   PICKUP
   DELIVERY
@@ -256,15 +264,17 @@ model UserAddress {
 }
 
 model Outlet {
-  id              Int      @id @default(autoincrement())
-  name            String
-  addressText     String
-  latitude        Decimal? @db.Decimal(10, 7)
-  longitude       Decimal? @db.Decimal(10, 7)
-  serviceRadiusKm Decimal  @default(5.00) @db.Decimal(6, 2)
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                 Int      @id @default(autoincrement())
+  name               String
+  addressText        String
+  latitude           Decimal? @db.Decimal(10, 7)
+  longitude          Decimal? @db.Decimal(10, 7)
+  serviceRadiusKm    Decimal  @default(5.00) @db.Decimal(6, 2)
+  photoUrl           String?  @db.VarChar(500)
+  location_category  String?  @db.VarChar(100)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   staff          OutletStaff[]
   shifts         Shift[]
@@ -283,30 +293,30 @@ model Outlet {
  * =========================
  */
 
- model ShiftTemplate {
-  id        Int      @id @default(autoincrement())
-  outletId  Int
-  name      String
-  startTime DateTime @db.Time
-  endTime   DateTime @db.Time
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+model ShiftTemplate {
+  id            Int           @id @default(autoincrement())
+  outletId      Int
+  name          String
+  startTime     DateTime      @db.Time
+  endTime       DateTime      @db.Time
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  outlet        Outlet        @relation(fields: [outletId], references: [id], onDelete: Cascade)
   assignedStaff OutletStaff[]
 
   @@index([outletId])
 }
 
 model OutletStaff {
-  id            Int          @id @default(autoincrement())
-  outletId      Int
-  userId        Int
-  workerStation StationType?
-  shiftTemplateId Int?         
+  id              Int            @id @default(autoincrement())
+  outletId        Int
+  userId          Int
+  workerStation   StationType?
+  shiftTemplateId Int?
   shiftTemplate   ShiftTemplate? @relation(fields: [shiftTemplateId], references: [id])
-  isActive      Boolean      @default(true)
-  createdAt     DateTime     @default(now())
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
 
   outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -419,6 +429,9 @@ model Order {
   createdByOutletAdminId Int
   serviceType ServiceType @default(REGULAR)
 
+  customerLatitude  String?
+  customerLongitude String?
+
   totalWeightKg  Decimal @db.Decimal(10, 2)
   subtotalAmount Decimal @default(0) @db.Decimal(14, 2)
   deliveryFee    Decimal @default(0) @db.Decimal(14, 2)
@@ -481,7 +494,7 @@ model OrderStation {
   status           StationStatus @default(PENDING)
 
   order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  worker User?  @relation("OrderStationWorker", fields: [assignedWorkerId], references: [id], onDelete: SetNull)
+  worker User? @relation("OrderStationWorker", fields: [assignedWorkerId], references: [id], onDelete: SetNull)
 
   itemCounts     StationItemCount[]
   bypassRequests BypassRequest[]
@@ -586,6 +599,7 @@ model Payment {
   status      PaymentStatus @default(PENDING)
   gatewayRef  String?       @unique
   paidAt      DateTime?
+  proofUrl    String?
   payloadJson Json?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
