@@ -3,8 +3,7 @@ import { Type } from "class-transformer";
 import { RoleCode } from "../../../../generated/prisma/client.js";
 
 export class AssignEmployeeDTO {
-  @Type(() => Number)
-  @IsInt()
+  @IsNumber()
   @IsNotEmpty()
   userId!: number;
 

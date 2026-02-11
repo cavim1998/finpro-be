@@ -1,44 +1,75 @@
 import { Request, Response, NextFunction } from "express";
 import { OrderService } from "./order.service.js";
+import { OrderStatus, RoleCode } from "../../../generated/prisma/client.js";
 import { ApiError } from "../../utils/api-error.js";
 
 export class OrderController {
   constructor(private orderService: OrderService) {}
 
-  createOrder = async (req: Request, res: Response, next: NextFunction) => {
+  create = async (req: Request, res: Response) => {
     try {
-      const authUser = res.locals.user as { sub?: string };
-      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
-      const outletAdminId = parseInt(authUser.sub);
+      const adminId = res.locals.user.userId;
 
-      const result = await this.orderService.createOrder(
-        req.body,
-        outletAdminId,
-      );
+      if (!adminId) {
+        return res
+          .status(401)
+          .send({ error: "Unauthorized: User ID not found in token" });
+      }
 
-      res.status(201).json({
-        message: "Order berhasil dibuat",
+      const result = await this.orderService.createOrder(req.body, adminId);
+
+      res.status(201).send({
+        message: "Order created successfully",
         data: result,
       });
-    } catch (error) {
-      next(error);
+    } catch (error: any) {
+      res.status(error.statusCode || 500).send({ error: error.message });
     }
   };
 
-  getOrders = async (req: Request, res: Response, next: NextFunction) => {
+  findAll = async (req: Request, res: Response) => {
     try {
-      const authUser = res.locals.user as { sub?: string };
-      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
-      const customerId = parseInt(authUser.sub);
+      const user = res.locals.user;
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 10;
+      const sortBy = (req.query.sortBy as string) || "createdAt";
+      const sortOrder = (req.query.sortOrder as "asc" | "desc") || "desc";
+      const status = req.query.status as OrderStatus | undefined;
+      const search = req.query.search as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
 
-      const result = await this.orderService.getOrders(customerId, req.query);
+      let outletId: number | undefined;
 
-      res.status(200).json({
-        message: "Orders berhasil diambil",
-        ...result,
+      if (user.role === RoleCode.SUPER_ADMIN) {
+        if (req.query.outletId) {
+          outletId = Number(req.query.outletId);
+        }
+      } else {
+        outletId = user.outletId;
+
+        if (!outletId) {
+          return res
+            .status(400)
+            .send({ error: "Outlet ID is required for Outlet Admin" });
+        }
+      }
+
+      const result = await this.orderService.findAll({
+        outletId,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        status,
+        search,
+        startDate,
+        endDate,
       });
-    } catch (error) {
-      next(error);
+
+      res.send(result);
+    } catch (error: any) {
+      res.status(500).send({ error: error.message });
     }
   };
 
