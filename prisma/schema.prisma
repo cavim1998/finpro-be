@@ -522,6 +522,7 @@ model BypassRequest {
   requestedByWorkerId Int
   approvedByAdminId   Int?
   reason              String
+  adminNote           String?
   status              BypassStatus @default(REQUESTED)
   requestedAt         DateTime     @default(now())
   decidedAt           DateTime?

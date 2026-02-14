@@ -50,6 +50,9 @@ import { WorkerService } from "./modules/worker/worker.service.js";
 import { PickupRequestService } from "./modules/pickup-request/pickup-request.service.js";
 import { PickupRequestController } from "./modules/pickup-request/pickup-request.controller.js";
 import { PickupRequestRouter } from "./modules/pickup-request/pickup-request.router.js";
+import { BypassService } from "./modules/bypass/bypass.service.js";
+import { BypassController } from "./modules/bypass/bypass.controller.js";
+import { BypassRouter } from "./modules/bypass/bypass.router.js";
 
 export class App {
   app: Express;
@@ -91,8 +94,9 @@ export class App {
     const shiftService = new ShiftService(prismaClient);
     const driverService = new DriverService(prismaClient);
     const orderService = new OrderService(prismaClient);
-    const pickupService = new PickupService(prismaClient);
+    const adminPickupService = new PickupService(prismaClient);
     const pickupRequestService = new PickupRequestService(prismaClient);
+    const bypassService = new BypassService(prismaClient);
 
     // controllers
     const sampleController = new SampleController(sampleService);
@@ -104,10 +108,11 @@ export class App {
     const shiftController = new ShiftController(shiftService);
     const driverController = new DriverController(driverService);
     const orderController = new OrderController(orderService);
-    const pickupController = new PickupController(pickupService);
+    const adminPickupController = new PickupController(adminPickupService);
     const pickupRequestController = new PickupRequestController(
       pickupRequestService,
     );
+    const bypassController = new BypassController(bypassService);
 
     // middlewares
     const validationMiddleware = new ValidationMiddleware();
@@ -155,10 +160,12 @@ export class App {
       validationMiddleware,
     );
     const orderRouter = new OrderRouter(orderController, validationMiddleware);
+    const adminPickupRouter = new PickupRouter(adminPickupController);
     const paymentRouter = new PaymentRouter(prismaClient, validationMiddleware);
     const workerService = new WorkerService();
     const workerController = new WorkerController(workerService);
     const workerRouter = new WorkerRouter(validationMiddleware);
+    const bypassRouter = new BypassRouter(bypassController);
 
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/auth", authRouter.getRouter());
@@ -168,11 +175,13 @@ export class App {
     this.app.use("/attendance", attendanceRouter.getRouter());
     this.app.use("/employees", employeeRouter.getRouter());
     this.app.use("/shifts", shiftRouter.getRouter());
+    this.app.use("/admin-pickup", adminPickupRouter.getRouter());
     this.app.use("/pickup-requests", pickupRequestRouter.getRouter());
     this.app.use("/orders", orderRouter.getRouter());
     this.app.use("/payments", paymentRouter.getRouter());
     this.app.use("/driver", verifyToken(JWT_SECRET), driverRouter.getRouter());
     this.app.use("/worker", workerRouter.getRouter());
+    this.app.use("/bypass", bypassRouter.getRouter());
   }
 
   private handleError() {
