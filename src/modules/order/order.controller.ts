@@ -8,7 +8,8 @@ export class OrderController {
 
   create = async (req: Request, res: Response) => {
     try {
-      const adminId = res.locals.user.userId;
+      // const adminId = res.locals.user.userId;
+      const adminId = res.locals.user.sub;
 
       if (!adminId) {
         return res

@@ -338,16 +338,17 @@ Membuat order dari pickup request yang sudah arrived. Hanya bisa dilakukan oleh 
 ```json
 {
   "pickupRequestId": "550e8400-e29b-41d4-a716-446655440000",
+  "serviceType": "REGULAR",
   "totalWeightKg": 5.5,
   "deliveryFee": 25000,
   "items": [
     {
       "itemId": 1,
-      "quantity": 3
+      "qty": 3
     },
     {
       "itemId": 2,
-      "quantity": 2
+      "qty": 2
     }
   ]
 }
@@ -355,70 +356,97 @@ Membuat order dari pickup request yang sudah arrived. Hanya bisa dilakukan oleh 
 
 **Field Descriptions:**
 
-- `pickupRequestId`: ID dari pickup request yang status-nya ARRIVED_OUTLET
-- `totalWeightKg`: Total berat laundry dalam kg (decimal, max 2 decimal places)
-- `deliveryFee`: Biaya pengiriman dalam Rupiah (decimal)
-- `items`: Array berisi laundry items dan jumlahnya
-  - `itemId`: ID dari laundry item (tipe: int)
-  - `quantity`: Jumlah item (tipe: int, min: 1)
+- `pickupRequestId`: ID dari pickup request yang status-nya ARRIVED_OUTLET (UUID, required)
+- `serviceType`: Tipe layanan - `REGULAR` atau `PREMIUM` (enum, required)
+  - `REGULAR`: Layanan biasa
+  - `PREMIUM`: Layanan premium dengan tambahan biaya 20% dari subtotal
+- `totalWeightKg`: Total berat laundry dalam kg (number, min: 0.1, required)
+- `deliveryFee`: Biaya pengiriman dalam Rupiah (number, min: 0, required)
+- `items`: Array berisi laundry items dan jumlahnya (required)
+  - `itemId`: ID dari laundry item (number, required)
+  - `qty`: Jumlah item (number, min: 1, required)
 
 **Response (201 Created):**
 
 ```json
 {
-  "status": "success",
   "message": "Order created successfully",
   "data": {
     "id": "660e8400-e29b-41d4-a716-446655440001",
-    "orderNumber": "INV-20260207-00001",
-    "customerId": 1,
-    "customerName": "John Doe",
+    "orderNo": "INV-20260215-104530-12345",
+    "pickupRequestId": "550e8400-e29b-41d4-a716-446655440000",
     "outletId": 5,
-    "outletName": "Outlet Jakarta Pusat",
-    "status": "ARRIVED_AT_OUTLET",
-    "totalWeight": 5.5,
-    "itemsCount": 5,
-    "items": [
-      {
-        "id": "770e8400-e29b-41d4-a716-446655440002",
-        "name": "Kaos",
-        "quantity": 3,
-        "unitPrice": 15000,
-        "subtotal": 45000
-      },
-      {
-        "id": "770e8400-e29b-41d4-a716-446655440003",
-        "name": "Celana Panjang",
-        "quantity": 2,
-        "unitPrice": 25000,
-        "subtotal": 50000
-      }
-    ],
-    "subtotal": 95000,
+    "customerId": 1,
+    "createdByOutletAdminId": 3,
+    "serviceType": "REGULAR",
+    "totalWeightKg": 5.5,
+    "subtotalAmount": 95000,
     "deliveryFee": 25000,
     "totalAmount": 120000,
-    "stations": [
-      {
-        "id": "880e8400-e29b-41d4-a716-446655440004",
-        "stationName": "Washing",
-        "status": "PENDING",
-        "order": 1
-      },
-      {
-        "id": "880e8400-e29b-41d4-a716-446655440005",
-        "stationName": "Ironing",
-        "status": "PENDING",
-        "order": 2
-      },
-      {
-        "id": "880e8400-e29b-41d4-a716-446655440006",
-        "stationName": "Packing",
-        "status": "PENDING",
-        "order": 3
-      }
-    ],
-    "createdAt": "2026-02-07T10:45:00Z"
+    "status": "ARRIVED_AT_OUTLET",
+    "paymentDueAt": "2026-02-18T10:45:30Z",
+    "createdAt": "2026-02-15T10:45:30Z",
+    "updatedAt": "2026-02-15T10:45:30Z"
   }
+}
+```
+
+**Response dengan PREMIUM Service (201 Created):**
+
+```json
+{
+  "message": "Order created successfully",
+  "data": {
+    "id": "660e8400-e29b-41d4-a716-446655440001",
+    "orderNo": "INV-20260215-104530-12345",
+    "pickupRequestId": "550e8400-e29b-41d4-a716-446655440000",
+    "outletId": 5,
+    "customerId": 1,
+    "createdByOutletAdminId": 3,
+    "serviceType": "PREMIUM",
+    "totalWeightKg": 5.5,
+    "subtotalAmount": 95000,
+    "deliveryFee": 25000,
+    "totalAmount": 144000,
+    "status": "ARRIVED_AT_OUTLET",
+    "paymentDueAt": "2026-02-18T10:45:30Z",
+    "createdAt": "2026-02-15T10:45:30Z",
+    "updatedAt": "2026-02-15T10:45:30Z"
+  }
+}
+```
+
+**Catatan:**
+
+- Premium fee (20% dari subtotal) otomatis ditambahkan untuk serviceType PREMIUM
+- Contoh: subtotal 95000 + premium fee 19000 (20%) + delivery 25000 = 144000
+- Payment due date otomatis di-set 3 hari dari tanggal pembuatan order
+- Order stations (WASHING, IRONING, PACKING) otomatis dibuat dengan status PENDING
+- Order number di-generate otomatis dengan format: `INV-YYYYMMDD-HHMMSS-RANDOM`
+
+**Error Responses:**
+
+```json
+{
+  "error": "Pickup Request tidak ditemukan"
+}
+```
+
+```json
+{
+  "error": "Pickup request belum sampai di outlet"
+}
+```
+
+```json
+{
+  "error": "Order sudah dibuat untuk pickup request ini"
+}
+```
+
+```json
+{
+  "error": "Item ID 123 tidak valid"
 }
 ```
 
@@ -426,154 +454,435 @@ Membuat order dari pickup request yang sudah arrived. Hanya bisa dilakukan oleh 
 
 #### **GET /orders**
 
-Mendapatkan list orders (untuk customer atau outlet staff).
+Mendapatkan list orders untuk outlet admin atau super admin. Endpoint ini digunakan untuk dashboard admin mengelola orders.
 
-**Required Auth:** Yes
+**Required Auth:** Yes (Outlet Admin, Super Admin)
 
 **Query Parameters:**
 
 ```
-status=ARRIVED_AT_OUTLET (optional: WAITING_DRIVER_PICKUP, ON_THE_WAY_TO_OUTLET, ARRIVED_AT_OUTLET, WASHING, IRONING, PACKING, WAITING_PAYMENT, READY_TO_DELIVER, DELIVERING_TO_CUSTOMER, RECEIVED_BY_CUSTOMER, CANCELED)
-fromDate=2026-02-01T00:00:00Z (optional: ISO format)
-toDate=2026-02-28T23:59:59Z (optional: ISO format)
-search=INV-20260207 (optional: search by order number)
+outletId=5 (optional, only for Super Admin - to filter by outlet)
+status=WASHING (optional: ARRIVED_AT_OUTLET, WASHING, IRONING, PACKING, WAITING_PAYMENT, READY_TO_DELIVER, DELIVERING_TO_CUSTOMER, RECEIVED_BY_CUSTOMER, CANCELED)
+search=INV-20260215 (optional: search by order number)
+startDate=2026-02-01T00:00:00Z (optional: filter orders from this date)
+endDate=2026-02-28T23:59:59Z (optional: filter orders until this date)
 page=1 (optional: default 1)
 limit=10 (optional: default 10)
+sortBy=createdAt (optional: default createdAt - field to sort by)
+sortOrder=desc (optional: default desc - asc or desc)
 ```
+
+**Catatan Penting:**
+
+- **Outlet Admin**: Hanya bisa melihat orders dari outlet mereka sendiri (outletId otomatis diambil dari token)
+- **Super Admin**: Bisa melihat semua orders atau filter by outletId menggunakan query parameter
 
 **Response (200 OK):**
 
 ```json
 {
-  "status": "success",
-  "message": "Orders retrieved successfully",
   "data": [
     {
       "id": "660e8400-e29b-41d4-a716-446655440001",
-      "orderNumber": "INV-20260207-00001",
-      "customerId": 1,
-      "customerName": "John Doe",
+      "orderNo": "INV-20260215-104530-12345",
+      "pickupRequestId": "550e8400-e29b-41d4-a716-446655440000",
       "outletId": 5,
-      "outletName": "Outlet Jakarta Pusat",
-      "status": "WAITING_PAYMENT",
-      "totalWeight": 5.5,
-      "itemsCount": 5,
-      "subtotal": 95000,
+      "customerId": 1,
+      "createdByOutletAdminId": 3,
+      "serviceType": "REGULAR",
+      "totalWeightKg": 5.5,
+      "subtotalAmount": 95000,
       "deliveryFee": 25000,
       "totalAmount": 120000,
-      "createdAt": "2026-02-07T10:45:00Z"
+      "orderStatus": "WASHING",
+      "paymentDueAt": "2026-02-18T10:45:30Z",
+      "createdAt": "2026-02-15T10:45:30Z",
+      "updatedAt": "2026-02-15T11:00:00Z",
+      "customer": {
+        "id": 1,
+        "email": "john@example.com",
+        "profile": {
+          "fullName": "John Doe",
+          "phone": "+6282123456789"
+        }
+      },
+      "items": [
+        {
+          "id": "770e8400-e29b-41d4-a716-446655440002",
+          "orderId": "660e8400-e29b-41d4-a716-446655440001",
+          "itemId": 1,
+          "qty": 3,
+          "price": 15000,
+          "item": {
+            "id": 1,
+            "name": "Kaos",
+            "description": "Kaos/T-Shirt"
+          }
+        },
+        {
+          "id": "770e8400-e29b-41d4-a716-446655440003",
+          "orderId": "660e8400-e29b-41d4-a716-446655440001",
+          "itemId": 2,
+          "qty": 2,
+          "price": 25000,
+          "item": {
+            "id": 2,
+            "name": "Celana Panjang",
+            "description": "Celana panjang/Long pants"
+          }
+        }
+      ],
+      "outlet": {
+        "id": 5,
+        "name": "Outlet Jakarta Pusat",
+        "addressText": "Jl. Merdeka No. 123, Jakarta Pusat"
+      },
+      "payments": [
+        {
+          "id": "990e8400-e29b-41d4-a716-446655440007",
+          "paidAt": "2026-02-15T12:30:00Z"
+        }
+      ],
+      "deliveryDate": null,
+      "isPaid": true,
+      "itemCount": 5
     }
   ],
-  "pagination": {
-    "total": 15,
+  "meta": {
+    "total": 25,
     "page": 1,
     "limit": 10,
-    "totalPages": 2
+    "totalPages": 3
   }
 }
 ```
 
+**Field Tambahan di Response:**
+
+- `deliveryDate`: Alias untuk `deliveredAt` (tanggal pengiriman selesai)
+- `isPaid`: Boolean - true jika ada payment dengan status PAID
+- `itemCount`: Total jumlah item (sum dari qty semua items)
+
 ---
 
-#### **GET /orders/:orderId**
+#### **GET /orders/:id**
 
-Mendapatkan detail order lengkap.
+Mendapatkan detail order lengkap. Endpoint ini untuk customer melihat detail order mereka.
 
-**Required Auth:** Yes
+**Required Auth:** Yes (Customer yang memiliki order)
+
+**Path Parameters:**
+
+- `id`: Order ID (UUID)
 
 **Response (200 OK):**
 
 ```json
 {
-  "status": "success",
-  "message": "Order retrieved successfully",
+  "message": "Order detail berhasil diambil",
   "data": {
     "id": "660e8400-e29b-41d4-a716-446655440001",
-    "orderNumber": "INV-20260207-00001",
-    "customerId": 1,
-    "customerName": "John Doe",
-    "customerPhone": "+6282123456789",
-    "customerEmail": "john@example.com",
+    "orderNo": "INV-20260215-104530-12345",
+    "pickupRequestId": "550e8400-e29b-41d4-a716-446655440000",
     "outletId": 5,
-    "outletName": "Outlet Jakarta Pusat",
-    "outletPhone": "+62212345678",
-    "outletAddress": "Jl. Merdeka No. 123, Jakarta Pusat",
+    "customerId": 1,
+    "createdByOutletAdminId": 3,
+    "serviceType": "REGULAR",
+    "totalWeightKg": 5.5,
+    "subtotalAmount": 95000,
+    "deliveryFee": 25000,
+    "totalAmount": 120000,
     "status": "WASHING",
-    "totalWeight": 5.5,
-    "itemsCount": 5,
+    "paymentDueAt": "2026-02-18T10:45:30Z",
+    "receivedConfirmedAt": null,
+    "deliveredAt": null,
+    "createdAt": "2026-02-15T10:45:30Z",
+    "updatedAt": "2026-02-15T11:00:00Z",
+    "outlet": {
+      "id": 5,
+      "name": "Outlet Jakarta Pusat",
+      "addressText": "Jl. Merdeka No. 123, Jakarta Pusat",
+      "latitude": -6.1944,
+      "longitude": 106.8296,
+      "phone": "+62212345678"
+    },
+    "customer": {
+      "id": 1,
+      "email": "john@example.com",
+      "profile": {
+        "fullName": "John Doe",
+        "phone": "+6282123456789"
+      }
+    },
     "items": [
       {
         "id": "770e8400-e29b-41d4-a716-446655440002",
-        "name": "Kaos",
-        "quantity": 3,
-        "unitPrice": 15000,
-        "subtotal": 45000
+        "orderId": "660e8400-e29b-41d4-a716-446655440001",
+        "itemId": 1,
+        "qty": 3,
+        "price": 15000,
+        "item": {
+          "id": 1,
+          "name": "Kaos",
+          "description": "Kaos/T-Shirt",
+          "price": 15000
+        }
       },
       {
         "id": "770e8400-e29b-41d4-a716-446655440003",
-        "name": "Celana Panjang",
-        "quantity": 2,
-        "unitPrice": 25000,
-        "subtotal": 50000
+        "orderId": "660e8400-e29b-41d4-a716-446655440001",
+        "itemId": 2,
+        "qty": 2,
+        "price": 25000,
+        "item": {
+          "id": 2,
+          "name": "Celana Panjang",
+          "description": "Celana panjang/Long pants",
+          "price": 25000
+        }
       }
     ],
-    "subtotal": 95000,
-    "deliveryFee": 25000,
-    "totalAmount": 120000,
     "stations": [
       {
         "id": "880e8400-e29b-41d4-a716-446655440004",
-        "stationName": "Washing",
-        "status": "IN_PROGRESS",
-        "order": 1,
-        "startedAt": "2026-02-07T11:00:00Z"
+        "orderId": "660e8400-e29b-41d4-a716-446655440001",
+        "stationType": "WASHING",
+        "status": "COMPLETED",
+        "workerId": 10,
+        "startedAt": "2026-02-15T11:00:00Z",
+        "completedAt": "2026-02-15T12:30:00Z",
+        "worker": {
+          "id": 10,
+          "profile": {
+            "fullName": "Ahmad Subagyo"
+          }
+        }
       },
       {
         "id": "880e8400-e29b-41d4-a716-446655440005",
-        "stationName": "Ironing",
-        "status": "PENDING",
-        "order": 2
+        "orderId": "660e8400-e29b-41d4-a716-446655440001",
+        "stationType": "IRONING",
+        "status": "IN_PROGRESS",
+        "workerId": 11,
+        "startedAt": "2026-02-15T12:35:00Z",
+        "completedAt": null,
+        "worker": {
+          "id": 11,
+          "profile": {
+            "fullName": "Siti Nurhaliza"
+          }
+        }
       },
       {
         "id": "880e8400-e29b-41d4-a716-446655440006",
-        "stationName": "Packing",
+        "orderId": "660e8400-e29b-41d4-a716-446655440001",
+        "stationType": "PACKING",
         "status": "PENDING",
-        "order": 3
+        "workerId": null,
+        "startedAt": null,
+        "completedAt": null,
+        "worker": null
       }
     ],
-    "createdAt": "2026-02-07T10:45:00Z",
-    "updatedAt": "2026-02-07T11:00:00Z"
+    "payments": [
+      {
+        "id": "990e8400-e29b-41d4-a716-446655440007",
+        "orderId": "660e8400-e29b-41d4-a716-446655440001",
+        "amount": 120000,
+        "provider": "QRIS",
+        "status": "PAID",
+        "createdAt": "2026-02-15T11:30:00Z",
+        "paidAt": "2026-02-15T12:00:00Z"
+      }
+    ],
+    "pickupRequest": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "customerId": 1,
+      "scheduledPickupAt": "2026-02-15T14:00:00Z",
+      "notes": "Ada barang sensitif, mohon hati-hati",
+      "address": {
+        "id": 1,
+        "addressLabel": "Rumah",
+        "addressText": "Jl. Sudirman No. 45, Jakarta Selatan",
+        "latitude": -6.2088,
+        "longitude": 106.8456
+      }
+    },
+    "driverTasks": [
+      {
+        "id": "aa0e8400-e29b-41d4-a716-446655440008",
+        "orderId": "660e8400-e29b-41d4-a716-446655440001",
+        "driverId": 20,
+        "taskType": "PICKUP",
+        "status": "COMPLETED",
+        "createdAt": "2026-02-15T09:00:00Z",
+        "completedAt": "2026-02-15T10:30:00Z",
+        "driver": {
+          "id": 20,
+          "profile": {
+            "fullName": "Budi Santoso",
+            "phone": "+6281298765432"
+          }
+        }
+      }
+    ],
+    "deliveryDate": null,
+    "isPaid": true,
+    "itemCount": 5
   }
 }
 ```
 
+**Field Tambahan di Response:**
+
+- `deliveryDate`: Alias untuk `deliveredAt` (tanggal pengiriman selesai)
+- `isPaid`: Boolean - true jika ada payment dengan status PAID
+- `itemCount`: Total jumlah item (sum dari qty semua items)
+
+**Error Responses:**
+
+```json
+{
+  "message": "Unauthorized",
+  "statusCode": 401
+}
+```
+
+```json
+{
+  "message": "Order tidak ditemukan",
+  "statusCode": 404
+}
+```
+
+**Catatan:**
+
+- Customer hanya bisa melihat order milik mereka sendiri (validasi berdasarkan customerId dari token)
+- Response mencakup detail lengkap: outlet, customer, items, stations (progress), payments, pickup request, dan driver tasks
+
 ---
 
-#### **PATCH /orders/:orderId/confirm-receipt**
+#### **PATCH /orders/:id**
 
 Customer konfirmasi telah menerima laundry (ubah status ke RECEIVED_BY_CUSTOMER).
 
-**Required Auth:** Yes (Customer yang membuat order)
+**Required Auth:** Yes (Customer yang memiliki order)
+
+**Path Parameters:**
+
+- `id`: Order ID (UUID)
 
 **Request Body:**
+
+```json
+{
+  "status": "RECEIVED_BY_CUSTOMER"
+}
+```
+
+atau
 
 ```json
 {}
 ```
 
+**Field Descriptions:**
+
+- `status`: (optional) Harus bernilai "RECEIVED_BY_CUSTOMER" jika ada
+
 **Response (200 OK):**
 
 ```json
 {
-  "status": "success",
-  "message": "Order receipt confirmed",
+  "message": "Order berhasil dikonfirmasi",
   "data": {
     "id": "660e8400-e29b-41d4-a716-446655440001",
+    "orderNo": "INV-20260215-104530-12345",
+    "pickupRequestId": "550e8400-e29b-41d4-a716-446655440000",
+    "outletId": 5,
+    "customerId": 1,
+    "createdByOutletAdminId": 3,
+    "serviceType": "REGULAR",
+    "totalWeightKg": 5.5,
+    "subtotalAmount": 95000,
+    "deliveryFee": 25000,
+    "totalAmount": 120000,
     "status": "RECEIVED_BY_CUSTOMER",
-    "receivedConfirmedAt": "2026-02-10T16:30:00Z"
+    "paymentDueAt": "2026-02-18T10:45:30Z",
+    "receivedConfirmedAt": "2026-02-17T16:30:00Z",
+    "deliveredAt": "2026-02-17T16:15:00Z",
+    "createdAt": "2026-02-15T10:45:30Z",
+    "updatedAt": "2026-02-17T16:30:00Z",
+    "outlet": {
+      "id": 5,
+      "name": "Outlet Jakarta Pusat",
+      "addressText": "Jl. Merdeka No. 123, Jakarta Pusat",
+      "latitude": -6.1944,
+      "longitude": 106.8296,
+      "phone": "+62212345678"
+    },
+    "items": [
+      {
+        "id": "770e8400-e29b-41d4-a716-446655440002",
+        "orderId": "660e8400-e29b-41d4-a716-446655440001",
+        "itemId": 1,
+        "qty": 3,
+        "price": 15000,
+        "item": {
+          "id": 1,
+          "name": "Kaos",
+          "description": "Kaos/T-Shirt",
+          "price": 15000
+        }
+      }
+    ]
   }
 }
 ```
+
+**Error Responses:**
+
+```json
+{
+  "message": "Unauthorized",
+  "statusCode": 401
+}
+```
+
+```json
+{
+  "message": "Order tidak ditemukan",
+  "statusCode": 404
+}
+```
+
+```json
+{
+  "message": "Order belum dalam status pengiriman",
+  "statusCode": 400
+}
+```
+
+```json
+{
+  "message": "Order sudah dikonfirmasi sebelumnya",
+  "statusCode": 400
+}
+```
+
+```json
+{
+  "message": "Invalid status. Only RECEIVED_BY_CUSTOMER is allowed",
+  "statusCode": 400
+}
+```
+
+**Catatan:**
+
+- Customer hanya bisa konfirmasi order milik mereka sendiri
+- Order harus dalam status `DELIVERING_TO_CUSTOMER` sebelum bisa dikonfirmasi
+- Setelah konfirmasi, `receivedConfirmedAt` akan di-set ke timestamp saat ini
+- Sistem juga memiliki auto-confirmation: jika customer tidak confirm dalam 48 jam setelah delivered, order otomatis dikonfirmasi
 
 ---
 
