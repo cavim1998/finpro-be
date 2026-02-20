@@ -83,6 +83,8 @@ export class App {
     const employeeService = new EmployeeService(prismaClient);
     const shiftService = new ShiftService(prismaClient);
     const driverService = new DriverService(prismaClient);
+    const attendanceService = new AttendanceService(prismaClient);
+    const workerService = new WorkerService();
 
     // controllers
     const sampleController = new SampleController(sampleService);
@@ -93,6 +95,8 @@ export class App {
     const employeeController = new EmployeeController(employeeService);
     const shiftController = new ShiftController(shiftService);
     const driverController = new DriverController(driverService);
+    const attendanceController = new AttendanceController(attendanceService);
+    const workerController = new WorkerController(workerService);
 
     // middlewares
     const validationMiddleware = new ValidationMiddleware();
@@ -118,8 +122,6 @@ export class App {
       validationMiddleware,
     );
 
-    const attendanceService = new AttendanceService(prismaClient);
-    const attendanceController = new AttendanceController(attendanceService);
     const attendanceRouter = new AttendanceRouter(
       attendanceController,
       validationMiddleware,
@@ -141,8 +143,6 @@ export class App {
     );
     const orderRouter = new OrderRouter(prismaClient, validationMiddleware);
     const paymentRouter = new PaymentRouter(prismaClient, validationMiddleware);
-    const workerService = new WorkerService();
-    const workerController = new WorkerController(workerService);
     const workerRouter = new WorkerRouter(validationMiddleware);
 
     this.app.use("/samples", sampleRouter.getRouter());

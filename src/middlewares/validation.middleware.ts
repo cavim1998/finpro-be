@@ -40,7 +40,10 @@ export class ValidationMiddleware {
 
   validateQuery<T>(dtoClass: new () => T) {
     return async (req: Request, _res: Response, next: NextFunction) => {
-      const dtoInstance = plainToInstance(dtoClass, req.query);
+      const dtoInstance = plainToInstance(dtoClass, req.query, {
+        enableImplicitConversion: true,
+      });
+
       const errors = await validate(dtoInstance as any);
       if (errors.length > 0) {
         const message = errors
@@ -49,14 +52,21 @@ export class ValidationMiddleware {
           .join(", ");
         throw new ApiError(message, 400);
       }
-      req.query = dtoInstance as any;
+
+      // ❌ JANGAN: req.query = dtoInstance
+      // ✅ LAKUKAN: merge ke object query yang sudah ada
+      Object.assign(req.query as any, dtoInstance as any);
+
       next();
     };
   }
 
   validateParams<T>(dtoClass: new () => T) {
     return async (req: Request, _res: Response, next: NextFunction) => {
-      const dtoInstance = plainToInstance(dtoClass, req.params);
+      const dtoInstance = plainToInstance(dtoClass, req.params, {
+        enableImplicitConversion: true,
+      });
+
       const errors = await validate(dtoInstance as any);
       if (errors.length > 0) {
         const message = errors
@@ -65,7 +75,10 @@ export class ValidationMiddleware {
           .join(", ");
         throw new ApiError(message, 400);
       }
-      req.params = dtoInstance as any;
+
+      // aman juga pakai merge (biar konsisten)
+      Object.assign(req.params as any, dtoInstance as any);
+
       next();
     };
   }

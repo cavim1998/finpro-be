@@ -2,11 +2,7 @@ import type { Request, Response } from "express";
 import { WorkerStationsService } from "./worker-stations.service.js";
 
 export class WorkerStationsController {
-  private service: WorkerStationsService;
-
-  constructor() {
-    this.service = new WorkerStationsService();
-  }
+  constructor(private service: WorkerStationsService) {}
 
   getIncoming = async (req: Request, res: Response) => {
     const stationType = String(req.params.stationType);
