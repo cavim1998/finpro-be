@@ -10,17 +10,6 @@ import { GetWorkerOrdersDto } from "./dto/get-worker-orders.dto.js";
 import { ClaimOrderParamDto } from "./dto/claim-order-param.dto.js";
 import { CompleteStationParamDto } from "./dto/complete-station-param.dto.js";
 import { CompleteStationDto } from "./dto/complete-station.dto.js";
-
-// DTOs (sesuaikan path/nama kalau berbeda)
-// import { StationParamDTO } from "./dto/station-param.dto.js";
-// import { GetWorkerOrdersDTO } from "./dto/get-worker-orders.dto.js";
-// import { ClaimOrderParamDTO } from "./dto/claim-order-param.dto.js";
-// import { CompleteStationDTO } from "./dto/complete-station.dto.js";
-// import { CompleteStationParamDTO } from "./dto/complete-station-param.dto.js";
-
-// OPTIONAL: kalau kamu sudah bikin dto bypass
-// import { BypassStationDTO } from "./dto/bypass-station.dto.js";
-
 export class WorkerRouter {
   private router: Router;
 
@@ -61,15 +50,6 @@ export class WorkerRouter {
       this.validationMiddleware.validateQuery(GetWorkerOrdersDto),
       workerController.getStationOrders,
     );
-
-    /**
-     * =========================
-     * STATIONS FLOW
-     * =========================
-     * POST /worker/stations/:stationType/:orderId/claim
-     * POST /worker/stations/:stationType/:orderId/complete   (payload: { itemCounts: [...] })
-     * POST /worker/stations/:stationType/:orderId/bypass
-     */
 
     // 1) CLAIM (startTask)
     this.router.post(
@@ -114,11 +94,9 @@ export class WorkerRouter {
     );
 
     // 3) BYPASS -> request ke admin
-    // Kalau DTO bypass belum ada, sementara terima any (tapi mending bikin DTO)
     this.router.post(
       "/stations/:stationType/:orderId/bypass",
       this.validationMiddleware.validateParams(CompleteStationParamDto),
-      // this.validationMiddleware.validateBody(BypassStationDTO),
       async (req, res) => {
         const userId = Number(res.locals.user?.sub);
         const { stationType, orderId } = req.params as any;

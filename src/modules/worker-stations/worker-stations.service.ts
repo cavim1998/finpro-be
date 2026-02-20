@@ -1,4 +1,4 @@
-// finpro-be/src/modules/worker-stations/worker-stations.service.ts
+import { PrismaClient } from "../../../generated/prisma/client.js";
 import {
   BypassStatus,
   OrderStatus,
@@ -75,6 +75,8 @@ function nextOrderStatusByStation(
 }
 
 export class WorkerStationsService {
+  constructor(private prisma: PrismaClient) {}
+
   async getIncoming(stationTypeRaw: string) {
     const stationType = assertStationType(stationTypeRaw);
 
@@ -94,7 +96,6 @@ export class WorkerStationsService {
         },
       },
     });
-
     return rows.map(mapStationToCardDTO);
   }
 

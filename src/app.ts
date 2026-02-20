@@ -93,10 +93,8 @@ export class App {
     const employeeService = new EmployeeService(prismaClient);
     const shiftService = new ShiftService(prismaClient);
     const driverService = new DriverService(prismaClient);
-    const orderService = new OrderService(prismaClient);
-    const adminPickupService = new PickupService(prismaClient);
-    const pickupRequestService = new PickupRequestService(prismaClient);
-    const bypassService = new BypassService(prismaClient);
+    const attendanceService = new AttendanceService(prismaClient);
+    const workerService = new WorkerService();
 
     // controllers
     const sampleController = new SampleController(sampleService);
@@ -107,12 +105,8 @@ export class App {
     const employeeController = new EmployeeController(employeeService);
     const shiftController = new ShiftController(shiftService);
     const driverController = new DriverController(driverService);
-    const orderController = new OrderController(orderService);
-    const adminPickupController = new PickupController(adminPickupService);
-    const pickupRequestController = new PickupRequestController(
-      pickupRequestService,
-    );
-    const bypassController = new BypassController(bypassService);
+    const attendanceController = new AttendanceController(attendanceService);
+    const workerController = new WorkerController(workerService);
 
     // middlewares
     const validationMiddleware = new ValidationMiddleware();
@@ -138,8 +132,6 @@ export class App {
       validationMiddleware,
     );
 
-    const attendanceService = new AttendanceService(prismaClient);
-    const attendanceController = new AttendanceController(attendanceService);
     const attendanceRouter = new AttendanceRouter(
       attendanceController,
       validationMiddleware,
@@ -162,8 +154,6 @@ export class App {
     const orderRouter = new OrderRouter(orderController, validationMiddleware);
     const adminPickupRouter = new PickupRouter(adminPickupController);
     const paymentRouter = new PaymentRouter(prismaClient, validationMiddleware);
-    const workerService = new WorkerService();
-    const workerController = new WorkerController(workerService);
     const workerRouter = new WorkerRouter(validationMiddleware);
     const bypassRouter = new BypassRouter(bypassController);
 
