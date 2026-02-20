@@ -17,7 +17,8 @@ export class DriverController {
   constructor(private driverService: DriverService) {}
 
   getDashboard = async (req: Request, res: Response<any, LocalsUser>) => {
-    const { id: userId, role } = res.locals.user;
+    const userId = Number((res.locals.user as any)?.sub);
+    const role = (res.locals.user as any)?.role;
 
     const data = await this.driverService.getDashboard(
       userId,
