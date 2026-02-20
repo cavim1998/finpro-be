@@ -140,6 +140,11 @@ enum ShiftAssignmentStatus {
   OFF_DUTY
 }
 
+enum ServiceType {
+  REGULAR
+  PREMIUM
+}
+
 /**
  * =========================
  * USERS & AUTH
@@ -422,6 +427,7 @@ model Order {
   outletId               Int
   customerId             Int
   createdByOutletAdminId Int
+  serviceType ServiceType @default(REGULAR)
 
   customerLatitude  String?
   customerLongitude String?
@@ -462,6 +468,7 @@ model OrderItem {
   orderId   String   @db.Uuid
   itemId    Int
   qty       Int
+  price     Decimal  @db.Decimal(10, 2)
   createdAt DateTime @default(now())
 
   order Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -515,6 +522,7 @@ model BypassRequest {
   requestedByWorkerId Int
   approvedByAdminId   Int?
   reason              String
+  adminNote           String?
   status              BypassStatus @default(REQUESTED)
   requestedAt         DateTime     @default(now())
   decidedAt           DateTime?

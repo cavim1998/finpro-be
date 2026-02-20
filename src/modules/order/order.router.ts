@@ -1,36 +1,31 @@
 import { Router } from "express";
 import { OrderController } from "./order.controller.js";
-import { OrderService } from "./order.service.js";
-import { verifyToken } from "../../middlewares/jwt.middleware.js";
+import {
+  verifyToken,
+  authorizeRole,
+} from "../../middlewares/jwt.middleware.js";
+import { JWT_SECRET } from "../../config/env.js";
 import { ValidationMiddleware } from "../../middlewares/validation.middleware.js";
 import { CreateOrderDTO } from "./dto/create-order.dto.js";
-import { PrismaClient } from "../../../generated/prisma/client.js";
-import { JWT_SECRET } from "../../config/env.js";
+import { RoleCode } from "../../../generated/prisma/client.js";
 
 export class OrderRouter {
   private router: Router;
-  private orderController: OrderController;
-  private validationMiddleware: ValidationMiddleware;
 
   constructor(
-    prisma: PrismaClient,
-    validationMiddleware: ValidationMiddleware,
+    private orderController: OrderController,
+    private validationMiddleware: ValidationMiddleware,
   ) {
     this.router = Router();
-    this.validationMiddleware = validationMiddleware;
-
-    const orderService = new OrderService(prisma);
-    this.orderController = new OrderController(orderService);
-
     this.initializeRoutes();
   }
 
   private initializeRoutes() {
-    // Customer routes
     this.router.get(
       "/",
       verifyToken(JWT_SECRET),
-      this.orderController.getOrders,
+      authorizeRole([RoleCode.OUTLET_ADMIN, RoleCode.SUPER_ADMIN]),
+      this.orderController.findAll,
     );
 
     this.router.get(
@@ -39,18 +34,18 @@ export class OrderRouter {
       this.orderController.getOrderById,
     );
 
+    this.router.post(
+      "/",
+      verifyToken(JWT_SECRET),
+      authorizeRole([RoleCode.OUTLET_ADMIN]),
+      this.validationMiddleware.validateBody(CreateOrderDTO),
+      this.orderController.create,
+    );
+
     this.router.patch(
       "/:id",
       verifyToken(JWT_SECRET),
       this.orderController.confirmOrder,
-    );
-
-    // Outlet admin routes
-    this.router.post(
-      "/",
-      verifyToken(JWT_SECRET),
-      this.validationMiddleware.validateBody(CreateOrderDTO),
-      this.orderController.createOrder,
     );
   }
 
