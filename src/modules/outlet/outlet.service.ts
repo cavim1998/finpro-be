@@ -1,4 +1,4 @@
-import { PrismaClient } from "../../../generated/prisma/client.js";
+import { PrismaClient, Prisma } from "../../../generated/prisma/client.js";
 import { ApiError } from "../../utils/api-error.js";
 import { CreateOutletDto } from "./dto/create-outlet.dto.js";
 import { UpdateOutletDto } from "./dto/update-outlet.dto.js";
@@ -6,14 +6,47 @@ import { UpdateOutletDto } from "./dto/update-outlet.dto.js";
 export class OutletService {
   constructor(private prisma: PrismaClient) {}
 
-  getAllOutlets = async () => {
-    return await this.prisma.outlet.findMany({
-      where: { isActive: true },
-      orderBy: { id: "asc" },
+  getAllOutlets = async (params: {
+    page: number;
+    limit: number;
+    search?: string;
+    sortBy: string;
+    sortOrder: "asc" | "desc";
+  }) => {
+    const skip = (params.page - 1) * params.limit;
+
+    const where: Prisma.OutletWhereInput = params.search
+      ? {
+          OR: [
+            { name: { contains: params.search, mode: "insensitive" } },
+            { addressText: { contains: params.search, mode: "insensitive" } },
+          ],
+        }
+      : {};
+
+    const data = await this.prisma.outlet.findMany({
+      where,
+      skip,
+      take: params.limit,
+      orderBy: { [params.sortBy]: params.sortOrder },
       include: {
-        _count: { select: { staff: true } },
+        _count: {
+          select: { staff: true },
+        },
       },
     });
+
+    const total = await this.prisma.outlet.count({ where });
+
+    return {
+      data,
+      meta: {
+        page: params.page,
+        take: params.limit,
+        total,
+        totalPages: Math.ceil(total / params.limit),
+      },
+    };
   };
 
   getOutletById = async (id: number) => {

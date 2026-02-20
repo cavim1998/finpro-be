@@ -1,21 +1,47 @@
-import { PrismaClient } from "../../../generated/prisma/client.js";
+import { PrismaClient, Prisma } from "../../../generated/prisma/client.js";
 import { CreateItemDTO } from "./dto/create-item.dto.js";
 
 export class LaundryItemService {
   constructor(private prisma: PrismaClient) {}
 
-  getAllItems = async () => {
-    return await this.prisma.laundryItem.findMany({
-      where: {
-        isActive: true,
-      },
-      orderBy: { name: "asc" },
+  getAllItems = async (params: {
+    search?: string;
+    page: number;
+    limit: number;
+    sortBy: string;
+    sortOrder: "asc" | "desc";
+  }) => {
+    const skip = (params.page - 1) * params.limit;
+
+    const where: Prisma.LaundryItemWhereInput = params.search
+      ? {
+          name: { contains: params.search, mode: "insensitive" },
+        }
+      : {};
+
+    const data = await this.prisma.laundryItem.findMany({
+      where,
+      skip,
+      take: params.limit,
+      orderBy: { [params.sortBy]: params.sortOrder },
       include: {
         _count: {
           select: { orderItems: true },
         },
       },
     });
+
+    const total = await this.prisma.laundryItem.count({ where });
+
+    return {
+      data,
+      meta: {
+        page: params.page,
+        take: params.limit,
+        total,
+        totalPages: Math.ceil(total / params.limit),
+      },
+    };
   };
 
   createItem = async (data: CreateItemDTO) => {
