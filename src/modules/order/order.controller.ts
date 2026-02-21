@@ -123,4 +123,28 @@ export class OrderController {
       next(error);
     }
   };
+
+  getAdminOrderById = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const user = res.locals.user;
+      const { id } = req.params;
+
+      const result = await this.orderService.getAdminOrderById(
+        id,
+        user.role as RoleCode,
+        user.outletId,
+      );
+
+      res.status(200).json({
+        message: "Order detail (Admin) berhasil diambil",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

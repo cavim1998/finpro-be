@@ -5,9 +5,15 @@ export class LaundryItemController {
   constructor(private laundryItemService: LaundryItemService) {}
 
   getItems = async (req: Request, res: Response) => {
-    const items = await this.laundryItemService.getAllItems();
+    const items = await this.laundryItemService.getAllItems({
+      search: req.query.search as string,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 10,
+      sortBy: (req.query.sortBy as string) || "name",
+      sortOrder: (req.query.sortOrder as "asc" | "desc") || "asc",
+    });
 
-    const formatted = items.map((item: any) => ({
+    const formatted = items.data.map((item: any) => ({
       id: item.id,
       name: item.name,
       unit: item.unit,

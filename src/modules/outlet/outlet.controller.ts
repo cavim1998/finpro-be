@@ -5,14 +5,15 @@ export class OutletController {
   constructor(private outletService: OutletService) {}
 
   getOutlets = async (req: Request, res: Response) => {
-    const outlets = await this.outletService.getAllOutlets();
+    const outlets = await this.outletService.getAllOutlets({
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 10,
+      search: req.query.search as string,
+      sortBy: (req.query.sortBy as string) || "createdAt",
+      sortOrder: (req.query.sortOrder as "asc" | "desc") || "desc",
+    });
 
-    const formatted = outlets.map((o) => ({
-      ...o,
-      staffCount: o._count.staff,
-    }));
-
-    res.status(200).send(formatted);
+    res.status(200).send(outlets);
   };
 
   getOutletById = async (req: Request, res: Response) => {

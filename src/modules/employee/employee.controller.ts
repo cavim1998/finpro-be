@@ -5,7 +5,15 @@ export class EmployeeController {
   constructor(private employeeService: EmployeeService) {}
 
   getAll = async (req: Request, res: Response) => {
-    const result = await this.employeeService.getAllEmployees();
+    const result = await this.employeeService.getAllEmployees({
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 10,
+      search: req.query.search as string,
+      outletId: req.query.outletId ? Number(req.query.outletId) : undefined,
+      role: req.query.role as string,
+      sortBy: (req.query.sortBy as string) || "createdAt",
+      sortOrder: (req.query.sortOrder as "asc" | "desc") || "desc",
+    });
     res.status(200).send(result);
   };
 
