@@ -95,6 +95,9 @@ export class App {
     const driverService = new DriverService(prismaClient);
     const attendanceService = new AttendanceService(prismaClient);
     const workerService = new WorkerService();
+    const orderService = new OrderService(prismaClient);
+    const adminPickupService = new PickupService(prismaClient);
+    const bypassService = new BypassService(prismaClient);
 
     // controllers
     const sampleController = new SampleController(sampleService);
@@ -107,6 +110,9 @@ export class App {
     const driverController = new DriverController(driverService);
     const attendanceController = new AttendanceController(attendanceService);
     const workerController = new WorkerController(workerService);
+    const orderController = new OrderController(orderService);
+    const adminPickupController = new PickupController(adminPickupService);
+    const bypassController = new BypassController(bypassService);
 
     // middlewares
     const validationMiddleware = new ValidationMiddleware();
