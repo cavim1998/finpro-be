@@ -5,6 +5,7 @@ import {
   StationStatus,
   PickupStatus,
   ServiceType,
+  RoleCode,
 } from "../../../generated/prisma/client.js";
 import { CreateOrderDTO } from "./dto/create-order.dto.js";
 import { ApiError } from "../../utils/api-error.js";
@@ -389,5 +390,36 @@ export class OrderService {
     // TODO: Send notifications to customers
 
     return { count: ordersToConfirm.length };
+  }
+
+  private readonly adminOrderInclude = {
+    customer: { select: { id: true, email: true, profile: true } },
+    outlet: true,
+    pickupRequest: { include: { address: true } },
+    items: { include: { item: true } },
+    stations: {
+      include: { worker: { include: { profile: true } } },
+      orderBy: { id: "asc" as const },
+    },
+    driverTasks: {
+      include: { driver: { include: { profile: true } } },
+      orderBy: { createdAt: "asc" as const },
+    },
+    payments: { orderBy: { createdAt: "desc" as const } },
+  };
+
+  async getAdminOrderById(orderId: string, role: RoleCode, outletId?: number) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: this.adminOrderInclude,
+    });
+
+    if (!order) throw new ApiError("Order tidak ditemukan", 404);
+
+    if (role === RoleCode.OUTLET_ADMIN && order.outletId !== outletId) {
+      throw new ApiError("Forbidden: Order bukan dari outlet Anda", 403);
+    }
+
+    return order;
   }
 }

@@ -47,6 +47,13 @@ export class OrderRouter {
       verifyToken(JWT_SECRET),
       this.orderController.confirmOrder,
     );
+
+    this.router.get(
+      "/admin/:id",
+      verifyToken(JWT_SECRET),
+      authorizeRole([RoleCode.SUPER_ADMIN, RoleCode.OUTLET_ADMIN]),
+      this.orderController.getAdminOrderById,
+    );
   }
 
   getRouter() {

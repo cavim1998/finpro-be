@@ -53,6 +53,12 @@ import { PickupRequestRouter } from "./modules/pickup-request/pickup-request.rou
 import { BypassService } from "./modules/bypass/bypass.service.js";
 import { BypassController } from "./modules/bypass/bypass.controller.js";
 import { BypassRouter } from "./modules/bypass/bypass.router.js";
+import { ReportService } from "./modules/report/report.service.js";
+import { ReportController } from "./modules/report/report.controller.js";
+import { ReportRouter } from "./modules/report/report.router.js";
+import { DashboardService } from "./modules/dashboard/dashboard.service.js";
+import { DashboardController } from "./modules/dashboard/dashboard.controller.js";
+import { DashboardRouter } from "./modules/dashboard/dashboard.router.js";
 
 export class App {
   app: Express;
@@ -98,6 +104,8 @@ export class App {
     const orderService = new OrderService(prismaClient);
     const adminPickupService = new PickupService(prismaClient);
     const bypassService = new BypassService(prismaClient);
+    const reportService = new ReportService(prismaClient);
+    const dashboardService = new DashboardService(prismaClient);
 
     // controllers
     const sampleController = new SampleController(sampleService);
@@ -113,6 +121,8 @@ export class App {
     const orderController = new OrderController(orderService);
     const adminPickupController = new PickupController(adminPickupService);
     const bypassController = new BypassController(bypassService);
+    const reportController = new ReportController(reportService);
+    const dashboardController = new DashboardController(dashboardService);
 
     // middlewares
     const validationMiddleware = new ValidationMiddleware();
@@ -162,6 +172,8 @@ export class App {
     const paymentRouter = new PaymentRouter(prismaClient, validationMiddleware);
     const workerRouter = new WorkerRouter(validationMiddleware);
     const bypassRouter = new BypassRouter(bypassController);
+    const reportRouter = new ReportRouter(reportController);
+    const dashboardRouter = new DashboardRouter(dashboardController);
 
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/auth", authRouter.getRouter());
@@ -178,6 +190,8 @@ export class App {
     this.app.use("/driver", verifyToken(JWT_SECRET), driverRouter.getRouter());
     this.app.use("/worker", workerRouter.getRouter());
     this.app.use("/bypass", bypassRouter.getRouter());
+    this.app.use("/reports", reportRouter.getRouter());
+    this.app.use("/dashboard", dashboardRouter.getRouter());
   }
 
   private handleError() {
