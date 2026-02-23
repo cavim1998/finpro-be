@@ -1,19 +1,55 @@
 import { PrismaClient } from "../../../generated/prisma/client.js";
 
+interface GetShiftsQuery {
+  page: number;
+  limit: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  outletId?: number;
+}
+
 export class ShiftService {
   constructor(private prisma: PrismaClient) {}
 
-  getShifts = async (outletId?: number) => {
-    return await this.prisma.shiftTemplate.findMany({
-      where: {
-        isActive: true,
-        ...(outletId ? { outletId } : {}),
+  getShifts = async (query: GetShiftsQuery) => {
+    const {
+      page,
+      limit,
+      search,
+      sortBy = "name",
+      sortOrder = "asc",
+      outletId,
+    } = query;
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      isActive: true,
+      ...(outletId ? { outletId } : {}),
+      ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
+    };
+
+    const [data, total] = await Promise.all([
+      this.prisma.shiftTemplate.findMany({
+        where,
+        include: {
+          outlet: { select: { name: true } },
+        },
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder },
+      }),
+      this.prisma.shiftTemplate.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        take: limit,
+        total,
       },
-      include: {
-        outlet: { select: { name: true } },
-      },
-      orderBy: [{ outletId: "asc" }, { startTime: "asc" }],
-    });
+    };
   };
 
   createShift = async (data: {
