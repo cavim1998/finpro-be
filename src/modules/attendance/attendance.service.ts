@@ -1,5 +1,6 @@
 import { PrismaClient } from "../../../generated/prisma/client.js";
 import { ApiError } from "../../utils/api-error.js";
+import { GetAttendanceHistoryDto } from "./dto/get-attendance-history.dto.js";
 
 const DEFAULT_TZ = "Asia/Jakarta";
 
@@ -15,6 +16,27 @@ export class AttendanceService {
     const key = this.getDateKeyToday(timeZone); // YYYY-MM-DD
     const [y, m, d] = key.split("-").map(Number);
     return new Date(Date.UTC(y, m - 1, d)); // UTC midnight
+  };
+
+  private parseDateOnly = (dateKey: string) => {
+    const [y, m, d] = dateKey.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d)); // UTC midnight
+  };
+
+  private getCurrentMonthRange = (timeZone = DEFAULT_TZ) => {
+    const todayKey = this.getDateKeyToday(timeZone); // YYYY-MM-DD
+    const [y, m] = todayKey.split("-").map(Number);
+    const start = new Date(Date.UTC(y, m - 1, 1));
+    const end = new Date(Date.UTC(y, m, 0));
+    return { start, end };
+  };
+
+  private getMonthRangeByDate = (date: Date) => {
+    const y = date.getUTCFullYear();
+    const m = date.getUTCMonth();
+    const start = new Date(Date.UTC(y, m, 1));
+    const end = new Date(Date.UTC(y, m + 1, 0));
+    return { start, end };
   };
 
   private resolveOutletStaff = async (userId: number) => {
@@ -111,5 +133,78 @@ export class AttendanceService {
       where: { id: existing.id },
       data: { clockOutAt: now, notes: notes ?? existing.notes ?? null },
     });
+  };
+
+  getHistory = async (userId: number, query: GetAttendanceHistoryDto) => {
+    const staff = await this.resolveOutletStaff(userId);
+
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(31, Math.max(1, query.limit ?? 7));
+    const skip = (page - 1) * limit;
+
+    const hasStart = !!query.startDate;
+    const hasEnd = !!query.endDate;
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (!hasStart && !hasEnd) {
+      const currentMonth = this.getCurrentMonthRange();
+      startDate = currentMonth.start;
+      endDate = currentMonth.end;
+    } else if (hasStart && hasEnd) {
+      startDate = this.parseDateOnly(query.startDate as string);
+      endDate = this.parseDateOnly(query.endDate as string);
+    } else if (hasStart) {
+      startDate = this.parseDateOnly(query.startDate as string);
+      endDate = this.getMonthRangeByDate(startDate).end;
+    } else {
+      endDate = this.parseDateOnly(query.endDate as string);
+      startDate = this.getMonthRangeByDate(endDate).start;
+    }
+
+    if (startDate > endDate) {
+      throw new ApiError("startDate cannot be greater than endDate", 400);
+    }
+
+    const [total, items] = await Promise.all([
+      this.prisma.attendanceLog.count({
+        where: {
+          outletStaffId: staff.id,
+          date: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+      }),
+      this.prisma.attendanceLog.findMany({
+        where: {
+          outletStaffId: staff.id,
+          date: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      outletStaffId: staff.id,
+      outletId: staff.outletId,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      filter: {
+        startDate,
+        endDate,
+      },
+      items,
+    };
   };
 }

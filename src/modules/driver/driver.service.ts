@@ -9,10 +9,13 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function getDateOnlyLocal() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+const DEFAULT_TZ = "Asia/Jakarta";
+
+function getDateOnlyByTimeZone(timeZone = DEFAULT_TZ) {
+  // en-CA => YYYY-MM-DD
+  const key = new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)); // UTC midnight
 }
 
 type TodayAttendance = {
@@ -35,7 +38,7 @@ export class DriverService {
   }
 
   async getActiveOutletStaffForDriver(userId: number) {
-    const today = getDateOnlyLocal();
+    const today = getDateOnlyByTimeZone();
 
     const onDuty = await this.prisma.outletStaff.findFirst({
       where: {
@@ -67,7 +70,7 @@ export class DriverService {
   }
 
   async getTodayAttendance(outletStaffId: number): Promise<TodayAttendance> {
-    const today = getDateOnlyLocal();
+    const today = getDateOnlyByTimeZone();
 
     const log = await this.prisma.attendanceLog.findUnique({
       where: { outletStaffId_date: { outletStaffId, date: today } },
@@ -128,56 +131,67 @@ export class DriverService {
 
     const [taskTotal, taskItems] = await Promise.all([
       this.prisma.driverTask.count({ where: { driverId: userId } }),
-      this.prisma.driverTask.findMany({
-        where: { driverId: userId },
-        orderBy: { createdAt: "desc" },
-        skip: (taskPage - 1) * pageSize,
-        take: pageSize,
-        include: {
-          pickupRequest: {
-            include: {
-              address: true,
-              customer: { select: { id: true, email: true, profile: true } },
-            },
-          },
-          order: true,
-        },
-      }),
-    ]);
-
-    const [pickupTotalRaw, pickupItemsRaw] = await Promise.all([
-      this.prisma.pickupRequest.count({
-        where: { assignedOutletId: staff.outletId, status: "WAITING_DRIVER" },
-      }),
-      this.prisma.pickupRequest.findMany({
-        where: { assignedOutletId: staff.outletId, status: "WAITING_DRIVER" },
-        orderBy: { createdAt: "desc" },
-        skip: (pickupPage - 1) * pageSize,
-        take: pageSize,
-        include: {
-          address: true,
-          customer: { select: { id: true, email: true, profile: true } },
-        },
-      }),
-    ]);
-
-    let pickupTotal = pickupTotalRaw;
-    let pickupItems: any[] = pickupItemsRaw;
-
-    // Fallback for demo/manual data changes:
-    // if WAITING_DRIVER is empty, read from Order WAITING_DRIVER_PICKUP.
-    if (pickupTotalRaw === 0) {
-      const [orderPickupTotal, orderPickupItems] = await Promise.all([
-        this.prisma.order.count({
-          where: {
-            outletId: staff.outletId,
-            status: "WAITING_DRIVER_PICKUP",
-            driverTasks: {
-              none: {
-                taskType: "PICKUP",
-                status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+      this.prisma.driverTask
+        .findMany({
+          where: { driverId: userId },
+          orderBy: { createdAt: "desc" },
+          skip: (taskPage - 1) * pageSize,
+          take: pageSize,
+          include: {
+            pickupRequest: {
+              include: {
+                address: true,
+                customer: { select: { id: true, email: true, profile: true } },
               },
             },
+            order: {
+              include: {
+                customer: {
+                  select: { id: true, email: true, profile: true },
+                },
+                pickupRequest: {
+                  include: {
+                    address: true,
+                    customer: {
+                      select: { id: true, email: true, profile: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        })
+        .then((items) =>
+          items.map((task) => {
+            const deliveryPickup = task.order?.pickupRequest ?? null;
+            const resolvedPickup = task.pickupRequest ?? deliveryPickup;
+            const resolvedCustomer =
+              resolvedPickup?.customer ?? task.order?.customer ?? null;
+            const resolvedToLat =
+              task.toLat ?? (resolvedPickup?.address?.latitude as any) ?? null;
+            const resolvedToLng =
+              task.toLng ?? (resolvedPickup?.address?.longitude as any) ?? null;
+
+            return {
+              ...task,
+              toLat: resolvedToLat,
+              toLng: resolvedToLng,
+              customerName: resolvedCustomer?.profile?.fullName ?? null,
+              customerPhone: resolvedCustomer?.profile?.phone ?? null,
+              customerAddressText: resolvedPickup?.address?.addressText ?? null,
+            };
+          }),
+        ),
+    ]);
+
+    const [pickupItemsRaw, orderPickupItems, readyDeliveryItems] =
+      await Promise.all([
+        this.prisma.pickupRequest.findMany({
+          where: { assignedOutletId: staff.outletId, status: "WAITING_DRIVER" },
+          orderBy: { createdAt: "desc" },
+          include: {
+            address: true,
+            customer: { select: { id: true, email: true, profile: true } },
           },
         }),
         this.prisma.order.findMany({
@@ -192,8 +206,29 @@ export class DriverService {
             },
           },
           orderBy: { createdAt: "desc" },
-          skip: (pickupPage - 1) * pageSize,
-          take: pageSize,
+          include: {
+            pickupRequest: {
+              include: {
+                address: true,
+                customer: {
+                  select: { id: true, email: true, profile: true },
+                },
+              },
+            },
+          },
+        }),
+        this.prisma.order.findMany({
+          where: {
+            outletId: staff.outletId,
+            status: "READY_TO_DELIVER",
+            driverTasks: {
+              none: {
+                taskType: "DELIVERY",
+                status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
           include: {
             pickupRequest: {
               include: {
@@ -207,17 +242,40 @@ export class DriverService {
         }),
       ]);
 
-      pickupTotal = orderPickupTotal;
-      pickupItems = orderPickupItems
-        .filter((o) => !!o.pickupRequest)
-        .map((o) => ({
-          ...(o.pickupRequest as any),
-          // expose order context in case FE needs it
-          orderId: o.id,
-          orderNo: o.orderNo,
-          orderStatus: o.status,
-        }));
-    }
+    const availablePickupFromOrder = orderPickupItems
+      .filter((o) => !!o.pickupRequest)
+      .map((o) => ({
+        ...(o.pickupRequest as any),
+        orderId: o.id,
+        orderNo: o.orderNo,
+        orderStatus: o.status,
+        driverAction: "PICKUP",
+      }));
+
+    const availableDelivery = readyDeliveryItems
+      .filter((o) => !!o.pickupRequest)
+      .map((o) => ({
+        ...(o.pickupRequest as any),
+        orderId: o.id,
+        orderNo: o.orderNo,
+        orderStatus: o.status,
+        driverAction: "DELIVERY",
+      }));
+
+    const pickupItemsAll = [
+      ...pickupItemsRaw.map((p) => ({ ...p, driverAction: "PICKUP" })),
+      ...availablePickupFromOrder,
+      ...availableDelivery,
+    ].sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+
+    const pickupTotal = pickupItemsAll.length;
+    const pickupItems = pickupItemsAll.slice(
+      (pickupPage - 1) * pageSize,
+      pickupPage * pageSize,
+    );
 
     const incoming = pickupTotal;
 
@@ -373,23 +431,42 @@ export class DriverService {
     this.requireDriver(role);
 
     return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.driverTask.updateMany({
+      const task = await tx.driverTask.findFirst({
         where: {
           id: taskId,
           driverId: userId,
           taskType: "PICKUP",
-          status: "IN_PROGRESS",
         },
-        data: { status: "DONE", completedAt: new Date() },
       });
 
-      if (updated.count === 0) {
+      if (!task) {
+        const err: any = new Error("Pickup task not found");
+        err.status = 404;
+        throw err;
+      }
+
+      if (task.status === "DONE") {
+        return { success: true };
+      }
+
+      if (!["ASSIGNED", "IN_PROGRESS"].includes(task.status)) {
         const err: any = new Error("Invalid pickup completion");
         err.status = 400;
         throw err;
       }
 
-      const task = await tx.driverTask.findUnique({ where: { id: taskId } });
+      const now = new Date();
+
+      await tx.driverTask.update({
+        where: { id: task.id },
+        data: {
+          status: "DONE",
+          // Allow direct arrived from ASSIGNED for FE flow that skips picked-up/start.
+          startedAt: task.startedAt ?? now,
+          completedAt: now,
+        },
+      });
+
       if (!task?.pickupRequestId) {
         const err: any = new Error("Pickup task missing pickupRequestId");
         err.status = 500;
@@ -399,7 +476,9 @@ export class DriverService {
       await tx.pickupRequest.updateMany({
         where: {
           id: task.pickupRequestId,
-          status: "PICKED_UP" as PickupStatus,
+          status: {
+            in: ["DRIVER_ASSIGNED", "PICKED_UP"] as PickupStatus[],
+          },
         },
         data: { status: "ARRIVED_OUTLET" },
       });
@@ -434,7 +513,15 @@ export class DriverService {
 
       const order = await tx.order.findUnique({
         where: { id: orderId },
-        include: { outlet: true },
+        include: {
+          outlet: true,
+          pickupRequest: {
+            include: {
+              address: true,
+              customer: { select: { id: true, email: true, profile: true } },
+            },
+          },
+        },
       });
 
       if (!order) {
@@ -443,16 +530,26 @@ export class DriverService {
         throw err;
       }
 
+      const fallbackLat =
+        order.customerLatitude ??
+        (order.pickupRequest?.address?.latitude as any)?.toString?.() ??
+        null;
+      const fallbackLng =
+        order.customerLongitude ??
+        (order.pickupRequest?.address?.longitude as any)?.toString?.() ??
+        null;
+
       const task = await tx.driverTask.create({
         data: {
           taskType: "DELIVERY",
           outletId: order.outletId,
           driverId: userId,
           orderId: order.id,
+          pickupRequestId: order.pickupRequestId,
           fromLat: order.outlet.latitude as any,
           fromLng: order.outlet.longitude as any,
-          toLat: order.customerLatitude as any,
-          toLng: order.customerLongitude as any,
+          toLat: fallbackLat as any,
+          toLng: fallbackLng as any,
           status: "ASSIGNED",
           assignedAt: new Date(),
         },
@@ -467,16 +564,61 @@ export class DriverService {
   async startTask(userId: number, role: RoleCode, taskId: number) {
     this.requireDriver(role);
 
-    const updated = await this.prisma.driverTask.updateMany({
-      where: {
-        id: taskId,
-        driverId: userId,
-        status: "ASSIGNED",
-      },
-      data: { status: "IN_PROGRESS", startedAt: new Date() },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const task = await tx.driverTask.findFirst({
+        where: {
+          id: taskId,
+          driverId: userId,
+          status: "ASSIGNED",
+        },
+        include: {
+          order: {
+            include: {
+              pickupRequest: {
+                include: { address: true },
+              },
+            },
+          },
+          pickupRequest: {
+            include: { address: true },
+          },
+        },
+      });
+
+      if (!task) return 0;
+
+      const updateData: any = {
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+      };
+
+      if (task.taskType === "DELIVERY" && (!task.toLat || !task.toLng)) {
+        const fallbackLat =
+          task.order?.customerLatitude ??
+          (task.order?.pickupRequest?.address?.latitude as any)?.toString?.() ??
+          (task.pickupRequest?.address?.latitude as any)?.toString?.() ??
+          null;
+        const fallbackLng =
+          task.order?.customerLongitude ??
+          (
+            task.order?.pickupRequest?.address?.longitude as any
+          )?.toString?.() ??
+          (task.pickupRequest?.address?.longitude as any)?.toString?.() ??
+          null;
+
+        updateData.toLat = task.toLat ?? (fallbackLat as any);
+        updateData.toLng = task.toLng ?? (fallbackLng as any);
+      }
+
+      await tx.driverTask.update({
+        where: { id: task.id },
+        data: updateData,
+      });
+
+      return 1;
     });
 
-    if (updated.count === 0) {
+    if (updated === 0) {
       const err: any = new Error("Task cannot be started");
       err.status = 400;
       throw err;
