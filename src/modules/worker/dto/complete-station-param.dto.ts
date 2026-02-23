@@ -1,8 +1,10 @@
-import { IsInt } from "class-validator";
-import { Type } from "class-transformer";
+import { IsEnum, IsString } from "class-validator";
+import { StationType } from "../../../../generated/prisma/enums.js";
 
 export class CompleteStationParamDto {
-  @Type(() => Number)
-  @IsInt()
-  orderStationId!: number;
+  @IsEnum(StationType)
+  stationType!: StationType;
+
+  @IsString()
+  orderId!: string;
 }
