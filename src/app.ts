@@ -36,12 +36,28 @@ import { ShiftService } from "./modules/shift/shift.service.js";
 import { UserController } from "./modules/users/user.controller.js";
 import { UserRouter } from "./modules/users/user.router.js";
 import { UserService } from "./modules/users/user.service.js";
-import { PickupRequestRouter } from "./modules/pickup-request/pickup-request.router.js";
+import { OrderService } from "./modules/order/order.service.js";
+import { OrderController } from "./modules/order/order.controller.js";
 import { OrderRouter } from "./modules/order/order.router.js";
+import { PickupService } from "./modules/pickup/pickup.service.js";
+import { PickupController } from "./modules/pickup/pickup.controller.js";
+import { PickupRouter } from "./modules/pickup/pickup.router.js";
 import { PaymentRouter } from "./modules/payment/payment.router.js";
 import { WorkerController } from "./modules/worker/worker.controller.js";
 import { WorkerRouter } from "./modules/worker/worker.router.js";
 import { WorkerService } from "./modules/worker/worker.service.js";
+import { PickupRequestService } from "./modules/pickup-request/pickup-request.service.js";
+import { PickupRequestController } from "./modules/pickup-request/pickup-request.controller.js";
+import { PickupRequestRouter } from "./modules/pickup-request/pickup-request.router.js";
+import { BypassService } from "./modules/bypass/bypass.service.js";
+import { BypassController } from "./modules/bypass/bypass.controller.js";
+import { BypassRouter } from "./modules/bypass/bypass.router.js";
+import { ReportService } from "./modules/report/report.service.js";
+import { ReportController } from "./modules/report/report.controller.js";
+import { ReportRouter } from "./modules/report/report.router.js";
+import { DashboardService } from "./modules/dashboard/dashboard.service.js";
+import { DashboardController } from "./modules/dashboard/dashboard.controller.js";
+import { DashboardRouter } from "./modules/dashboard/dashboard.router.js";
 
 export class App {
   app: Express;
@@ -84,6 +100,11 @@ export class App {
     const driverService = new DriverService(prismaClient);
     const attendanceService = new AttendanceService(prismaClient);
     const workerService = new WorkerService();
+    const orderService = new OrderService(prismaClient);
+    const adminPickupService = new PickupService(prismaClient);
+    const bypassService = new BypassService(prismaClient);
+    const reportService = new ReportService(prismaClient);
+    const dashboardService = new DashboardService(prismaClient);
 
     // controllers
     const sampleController = new SampleController(sampleService);
@@ -96,6 +117,11 @@ export class App {
     const driverController = new DriverController(driverService);
     const attendanceController = new AttendanceController(attendanceService);
     const workerController = new WorkerController(workerService);
+    const orderController = new OrderController(orderService);
+    const adminPickupController = new PickupController(adminPickupService);
+    const bypassController = new BypassController(bypassService);
+    const reportController = new ReportController(reportService);
+    const dashboardController = new DashboardController(dashboardService);
 
     // middlewares
     const validationMiddleware = new ValidationMiddleware();
@@ -140,9 +166,13 @@ export class App {
       prismaClient,
       validationMiddleware,
     );
-    const orderRouter = new OrderRouter(prismaClient, validationMiddleware);
+    const orderRouter = new OrderRouter(orderController, validationMiddleware);
+    const adminPickupRouter = new PickupRouter(adminPickupController);
     const paymentRouter = new PaymentRouter(prismaClient, validationMiddleware);
     const workerRouter = new WorkerRouter(validationMiddleware);
+    const bypassRouter = new BypassRouter(bypassController);
+    const reportRouter = new ReportRouter(reportController);
+    const dashboardRouter = new DashboardRouter(dashboardController);
 
     this.app.use("/samples", sampleRouter.getRouter());
     this.app.use("/auth", authRouter.getRouter());
@@ -152,11 +182,15 @@ export class App {
     this.app.use("/attendance", attendanceRouter.getRouter());
     this.app.use("/employees", employeeRouter.getRouter());
     this.app.use("/shifts", shiftRouter.getRouter());
+    this.app.use("/admin-pickup", adminPickupRouter.getRouter());
     this.app.use("/pickup-requests", pickupRequestRouter.getRouter());
     this.app.use("/orders", orderRouter.getRouter());
     this.app.use("/payments", paymentRouter.getRouter());
     this.app.use("/driver", driverRouter.getRouter());
     this.app.use("/worker", workerRouter.getRouter());
+    this.app.use("/bypass", bypassRouter.getRouter());
+    this.app.use("/reports", reportRouter.getRouter());
+    this.app.use("/dashboard", dashboardRouter.getRouter());
   }
 
   private handleError() {

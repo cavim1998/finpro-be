@@ -31,3 +31,17 @@ export const verifyToken = (secretKey: string) => {
     });
   };
 };
+
+export const authorizeRole = (allowedRoles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = res.locals.user;
+    if (!user || !allowedRoles.includes(user.role)) {
+      throw new ApiError(
+        `Access Denied: You don't have permission, ${user}`,
+        403,
+      );
+    }
+
+    next();
+  };
+};

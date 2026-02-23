@@ -7,16 +7,18 @@ import {
   IsUUID,
   Min,
   ValidateNested,
+  IsEnum,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { ServiceType } from "../../../../generated/prisma/client.js";
 
 class OrderItemDTO {
   @IsNotEmpty()
-  @IsInt()
+  @IsNumber()
   itemId!: number;
 
   @IsNotEmpty()
-  @IsInt()
+  @IsNumber()
   @Min(1)
   qty!: number;
 }
@@ -25,6 +27,9 @@ export class CreateOrderDTO {
   @IsNotEmpty()
   @IsUUID()
   pickupRequestId!: string;
+
+  @IsEnum(ServiceType)
+  serviceType!: ServiceType;
 
   @IsNotEmpty()
   @IsNumber()
