@@ -4,9 +4,22 @@ import { ApiError } from "../utils/api-error.js";
 
 export const verifyToken = (secretKey: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const token = req.headers.authorization?.split(" ")[1];
+    const authHeader = (req.headers.authorization ?? "").trim();
+    const parts = authHeader.split(/\s+/).filter(Boolean);
 
-    if (!token) throw new ApiError("No token provided", 401);
+    let token = "";
+    if (parts.length === 1) {
+      token = parts[0];
+    } else if (parts.length >= 2 && parts[0].toLowerCase() === "bearer") {
+      token = parts[parts.length - 1];
+    }
+
+    // Handle accidentally quoted tokens, e.g. "eyJ..."
+    token = token.replace(/^"(.*)"$/, "$1");
+
+    if (!token || token === "undefined" || token === "null") {
+      throw new ApiError("No token provided", 401);
+    }
 
     jwt.verify(token, secretKey, (err, payload) => {
       if (err) {

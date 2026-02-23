@@ -1,11 +1,10 @@
 import cors from "cors";
 import express, { Express } from "express";
 import "reflect-metadata";
-import { JWT_SECRET, PORT } from "./config/env.js";
+import { PORT } from "./config/env.js";
 import { loggerHttp } from "./lib/logger-http.js";
 import { prisma } from "./lib/prisma.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
-import { verifyToken } from "./middlewares/jwt.middleware.js";
 import { UploaderMiddleware } from "./middlewares/uploader.middleware.js";
 import { ValidationMiddleware } from "./middlewares/validation.middleware.js";
 import { AttendanceController } from "./modules/attendance/attendance.controller.js";
@@ -156,7 +155,7 @@ export class App {
     this.app.use("/pickup-requests", pickupRequestRouter.getRouter());
     this.app.use("/orders", orderRouter.getRouter());
     this.app.use("/payments", paymentRouter.getRouter());
-    this.app.use("/driver", verifyToken(JWT_SECRET), driverRouter.getRouter());
+    this.app.use("/driver", driverRouter.getRouter());
     this.app.use("/worker", workerRouter.getRouter());
   }
 

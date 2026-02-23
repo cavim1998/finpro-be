@@ -43,7 +43,23 @@ export class AuthService {
     return ticket.getPayload();
   };
 
-  private buildAuthData = (
+  private resolveUserStation = async (userId: number, role: RoleCode) => {
+    if (role !== "WORKER") return null;
+
+    const staff = await this.prisma.outletStaff.findFirst({
+      where: {
+        userId,
+        isActive: true,
+        workerStation: { not: null },
+      },
+      select: { workerStation: true },
+      orderBy: { id: "desc" },
+    });
+
+    return staff?.workerStation ?? null;
+  };
+
+  private buildAuthData = async (
     user: {
       id: number;
       email: string | null;
@@ -53,11 +69,16 @@ export class AuthService {
     },
     accessToken: string,
   ) => {
+    const station = await this.resolveUserStation(user.id, user.role);
+
     return {
       user: {
         id: user.id,
         name: user.profile?.fullName || "",
         email: user.email || "",
+        role: user.role,
+        roleCode: user.role,
+        station,
         verified: user.isEmailVerified,
         profileImage: user.profile?.photoUrl || undefined,
       },
@@ -66,7 +87,7 @@ export class AuthService {
     };
   };
 
-  private buildAuthResponse = (
+  private buildAuthResponse = async (
     user: {
       id: number;
       email: string | null;
@@ -79,7 +100,7 @@ export class AuthService {
     return {
       status: "success",
       message: "Login successful",
-      data: this.buildAuthData(user, accessToken),
+      data: await this.buildAuthData(user, accessToken),
     };
   };
 
@@ -578,7 +599,7 @@ export class AuthService {
     return {
       status: "success",
       message: "Account created successfully",
-      data: this.buildAuthData(user, token),
+      data: await this.buildAuthData(user, token),
     };
   };
 
