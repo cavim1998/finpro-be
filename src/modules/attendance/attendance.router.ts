@@ -6,6 +6,7 @@ import { ValidationMiddleware } from "../../middlewares/validation.middleware.js
 import { AttendanceController } from "./attendance.controller.js";
 import { ClockInDto } from "./dto/clock-in.dto.js";
 import { ClockOutDto } from "./dto/clock-out.dto.js";
+import { GetAttendanceHistoryDto } from "./dto/get-attendance-history.dto.js";
 
 export class AttendanceRouter {
   private router: Router;
@@ -21,6 +22,14 @@ export class AttendanceRouter {
       verifyToken(JWT_SECRET),
       requireRole(["WORKER", "DRIVER"]),
       this.attendanceController.getToday,
+    );
+
+    this.router.get(
+      "/me/history",
+      verifyToken(JWT_SECRET),
+      requireRole(["WORKER", "DRIVER"]),
+      this.validationMiddleware.validateQuery(GetAttendanceHistoryDto),
+      this.attendanceController.getHistory,
     );
 
     this.router.post(

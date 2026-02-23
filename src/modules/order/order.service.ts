@@ -89,6 +89,8 @@ export class OrderService {
           createdByOutletAdminId: Number(adminId),
 
           serviceType: data.serviceType,
+          customerLatitude: pickup.address?.latitude?.toString() ?? null,
+          customerLongitude: pickup.address?.longitude?.toString() ?? null,
 
           totalWeightKg: data.totalWeightKg,
           subtotalAmount: subtotal,
