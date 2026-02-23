@@ -13,16 +13,7 @@ export class LaundryItemController {
       sortOrder: (req.query.sortOrder as "asc" | "desc") || "asc",
     });
 
-    const formatted = items.data.map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      unit: item.unit,
-      price: item.price,
-      isActive: item.isActive,
-      usageCount: item._count?.orderItems || 0,
-    }));
-
-    res.status(200).send(formatted);
+    res.status(200).send(items);
   };
 
   createItem = async (req: Request, res: Response) => {
