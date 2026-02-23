@@ -111,12 +111,15 @@ export class DriverService {
     const taskPage = Math.max(1, q.taskPage ?? 1);
     const pickupPage = Math.max(1, q.pickupPage ?? 1);
 
-    const [incoming, inProgress, completed] = await Promise.all([
+    const [, inProgress, completed] = await Promise.all([
       this.prisma.pickupRequest.count({
         where: { assignedOutletId: staff.outletId, status: "WAITING_DRIVER" },
       }),
       this.prisma.driverTask.count({
-        where: { driverId: userId, status: "IN_PROGRESS" },
+        where: {
+          driverId: userId,
+          status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+        },
       }),
       this.prisma.driverTask.count({
         where: { driverId: userId, status: "DONE" },
@@ -142,7 +145,7 @@ export class DriverService {
       }),
     ]);
 
-    const [pickupTotal, pickupItems] = await Promise.all([
+    const [pickupTotalRaw, pickupItemsRaw] = await Promise.all([
       this.prisma.pickupRequest.count({
         where: { assignedOutletId: staff.outletId, status: "WAITING_DRIVER" },
       }),
@@ -157,6 +160,66 @@ export class DriverService {
         },
       }),
     ]);
+
+    let pickupTotal = pickupTotalRaw;
+    let pickupItems: any[] = pickupItemsRaw;
+
+    // Fallback for demo/manual data changes:
+    // if WAITING_DRIVER is empty, read from Order WAITING_DRIVER_PICKUP.
+    if (pickupTotalRaw === 0) {
+      const [orderPickupTotal, orderPickupItems] = await Promise.all([
+        this.prisma.order.count({
+          where: {
+            outletId: staff.outletId,
+            status: "WAITING_DRIVER_PICKUP",
+            driverTasks: {
+              none: {
+                taskType: "PICKUP",
+                status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+              },
+            },
+          },
+        }),
+        this.prisma.order.findMany({
+          where: {
+            outletId: staff.outletId,
+            status: "WAITING_DRIVER_PICKUP",
+            driverTasks: {
+              none: {
+                taskType: "PICKUP",
+                status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          skip: (pickupPage - 1) * pageSize,
+          take: pageSize,
+          include: {
+            pickupRequest: {
+              include: {
+                address: true,
+                customer: {
+                  select: { id: true, email: true, profile: true },
+                },
+              },
+            },
+          },
+        }),
+      ]);
+
+      pickupTotal = orderPickupTotal;
+      pickupItems = orderPickupItems
+        .filter((o) => !!o.pickupRequest)
+        .map((o) => ({
+          ...(o.pickupRequest as any),
+          // expose order context in case FE needs it
+          orderId: o.id,
+          orderNo: o.orderNo,
+          orderStatus: o.status,
+        }));
+    }
+
+    const incoming = pickupTotal;
 
     return {
       outletStaff: staff,
@@ -185,7 +248,15 @@ export class DriverService {
         where: {
           id: pickupId,
           assignedOutletId: staff.outletId,
-          status: "WAITING_DRIVER",
+          OR: [
+            { status: "WAITING_DRIVER" },
+            {
+              status: "ARRIVED_OUTLET",
+              order: {
+                is: { status: "WAITING_DRIVER_PICKUP" },
+              },
+            },
+          ],
         },
         data: { status: "DRIVER_ASSIGNED" },
       });
@@ -213,7 +284,6 @@ export class DriverService {
           outletId: pickup.assignedOutletId,
           driverId: userId,
           pickupRequestId: pickup.id,
-          // asumsi lat/lng DriverTask adalah string? (recommended)
           fromLat: pickup.address.latitude as any,
           fromLng: pickup.address.longitude as any,
           toLat: pickup.outlet.latitude as any,
@@ -228,7 +298,6 @@ export class DriverService {
     });
   }
 
-  // POST /driver/pickups/:taskId/cancel  (reassign allowed only when ASSIGNED)
   async cancelPickup(userId: number, role: RoleCode, taskId: number) {
     this.requireDriver(role);
 

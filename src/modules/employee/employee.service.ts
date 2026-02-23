@@ -1,5 +1,6 @@
 import {
   PrismaClient,
+  Prisma,
   RoleCode,
   UserStatus,
 } from "../../../generated/prisma/client.js";
@@ -9,12 +10,38 @@ import { ShiftAssignmentStatus } from "../../../generated/prisma/client.js";
 export class EmployeeService {
   constructor(private prisma: PrismaClient) {}
 
-  getAllEmployees = async () => {
-    const employees = await this.prisma.outletStaff.findMany({
-      where: {
-        isActive: true,
-        user: { status: UserStatus.ACTIVE },
-      },
+  getAllEmployees = async (params: {
+    page: number;
+    limit: number;
+    sortBy: string;
+    sortOrder: "asc" | "desc";
+    search?: string;
+    outletId?: number;
+    role?: string;
+  }) => {
+    const skip = (params.page - 1) * params.limit;
+
+    const where: Prisma.OutletStaffWhereInput = {
+      isActive: true,
+      user: { status: UserStatus.ACTIVE },
+      ...(params.role && { role: params.role as any }),
+      ...(params.outletId && { outletId: params.outletId }),
+      ...(params.search && {
+        OR: [
+          {
+            user: {
+              email: { contains: params.search, mode: "insensitive" },
+              profile: {
+                fullName: { contains: params.search, mode: "insensitive" },
+              },
+            },
+          },
+        ],
+      }),
+    };
+
+    const data = await this.prisma.outletStaff.findMany({
+      where,
       include: {
         user: {
           select: {
@@ -28,10 +55,25 @@ export class EmployeeService {
           select: { id: true, name: true },
         },
       },
-      orderBy: { createdAt: "desc" },
+      skip,
+      take: params.limit,
+      orderBy:
+        params.sortBy === "fullName"
+          ? { user: { profile: { fullName: params.sortOrder } } }
+          : { [params.sortBy]: params.sortOrder },
     });
 
-    return employees;
+    const total = await this.prisma.outletStaff.count({ where });
+
+    return {
+      data,
+      meta: {
+        page: params.page,
+        take: params.limit,
+        total,
+        totalPages: Math.ceil(total / params.limit),
+      },
+    };
   };
 
   getAvailableUsers = async () => {

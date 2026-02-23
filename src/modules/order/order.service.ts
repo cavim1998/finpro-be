@@ -2,11 +2,13 @@ import {
   PrismaClient,
   OrderStatus,
   StationType,
+  StationStatus,
   PickupStatus,
+  ServiceType,
+  RoleCode,
 } from "../../../generated/prisma/client.js";
-import { ApiError } from "../../utils/api-error.js";
 import { CreateOrderDTO } from "./dto/create-order.dto.js";
-import { GetOrdersDTO } from "./dto/get-orders.dto.js";
+import { ApiError } from "../../utils/api-error.js";
 
 export class OrderService {
   constructor(private prisma: PrismaClient) {}
@@ -26,92 +28,86 @@ export class OrderService {
     return `INV-${dateStr}-${timeStr}-${random}`;
   }
 
-  async createOrder(dto: CreateOrderDTO, outletAdminId: number) {
-    // 1. Validate pickup request exists and status is ARRIVED_OUTLET
-    const pickupRequest = await this.prisma.pickupRequest.findUnique({
-      where: { id: dto.pickupRequestId },
-      include: {
-        customer: true,
-        outlet: true,
-        order: true,
-      },
-    });
+  createOrder = async (data: CreateOrderDTO, adminId: string) => {
+    return await this.prisma.$transaction(async (tx) => {
+      const pickup = await tx.pickupRequest.findUnique({
+        where: { id: data.pickupRequestId },
+        include: { address: true, order: true },
+      });
 
-    if (!pickupRequest) {
-      throw new ApiError("Pickup request tidak ditemukan", 404);
-    }
+      if (!pickup) throw new ApiError("Pickup Request tidak ditemukan", 404);
 
-    if (pickupRequest.status !== PickupStatus.ARRIVED_OUTLET) {
-      throw new ApiError("Pickup request belum sampai di outlet", 400);
-    }
-
-    if (pickupRequest.order) {
-      throw new ApiError("Order sudah dibuat untuk pickup request ini", 400);
-    }
-
-    // 2. Validate all items exist
-    const itemIds = dto.items.map((item) => item.itemId);
-    const laundryItems = await this.prisma.laundryItem.findMany({
-      where: {
-        id: { in: itemIds },
-        isActive: true,
-      },
-    });
-
-    if (laundryItems.length !== itemIds.length) {
-      throw new ApiError("Beberapa item tidak ditemukan atau tidak aktif", 400);
-    }
-
-    // 3. Calculate amounts
-    let subtotalAmount = 0;
-    for (const orderItem of dto.items) {
-      const laundryItem = laundryItems.find(
-        (item) => item.id === orderItem.itemId,
-      );
-      if (laundryItem) {
-        subtotalAmount += orderItem.qty * Number(laundryItem.price);
+      if (pickup.status !== PickupStatus.ARRIVED_OUTLET) {
+        throw new ApiError("Pickup request belum sampai di outlet", 400);
       }
-    }
 
-    const totalAmount = subtotalAmount + dto.deliveryFee;
+      if (pickup.order) {
+        throw new ApiError("Order sudah dibuat untuk pickup request ini", 400);
+      }
 
-    // 4. Calculate payment deadline (after packing complete + 2 hours buffer)
-    // Estimate: washing (1 day) + ironing (1 day) + packing (0.5 day) = 2.5 days
-    const paymentDueAt = new Date();
-    paymentDueAt.setDate(paymentDueAt.getDate() + 3); // 2.5 days + buffer
+      let subtotal = 0;
+      const orderItemsData = [];
 
-    // 5. Create order with transaction
-    const order = await this.prisma.$transaction(async (tx) => {
-      // Generate order number inside transaction
-      const orderNo = this.generateOrderNumber();
+      for (const itemDto of data.items) {
+        const itemMaster = await tx.laundryItem.findUnique({
+          where: { id: itemDto.itemId },
+        });
+        if (!itemMaster)
+          throw new ApiError(`Item ID ${itemDto.itemId} tidak valid`, 400);
 
-      // Create order
+        const priceNow = Number(itemMaster.price);
+
+        subtotal += priceNow * itemDto.qty;
+
+        orderItemsData.push({
+          itemId: itemDto.itemId,
+          qty: itemDto.qty,
+          price: priceNow,
+        });
+      }
+
+      let premiumFee = 0;
+      if (data.serviceType === ServiceType.PREMIUM) {
+        premiumFee = subtotal * 0.2;
+      }
+
+      const deliveryFee = data.deliveryFee || 0;
+
+      const totalAmount = subtotal + premiumFee + deliveryFee;
+
+      const paymentDueAt = new Date();
+      paymentDueAt.setDate(paymentDueAt.getDate() + 3);
+
+      const orderNo = await this.generateOrderNumber();
+
       const newOrder = await tx.order.create({
         data: {
           orderNo,
-          pickupRequestId: dto.pickupRequestId,
-          outletId: pickupRequest.assignedOutletId,
-          customerId: pickupRequest.customerId,
-          createdByOutletAdminId: outletAdminId,
-          totalWeightKg: dto.totalWeightKg,
-          subtotalAmount,
-          deliveryFee: dto.deliveryFee,
-          totalAmount,
+          pickupRequestId: data.pickupRequestId,
+          outletId: pickup.assignedOutletId,
+          customerId: pickup.customerId,
+          createdByOutletAdminId: Number(adminId),
+
+          serviceType: data.serviceType,
+
+          totalWeightKg: data.totalWeightKg,
+          subtotalAmount: subtotal,
+          deliveryFee: deliveryFee,
+          totalAmount: totalAmount,
+
           status: OrderStatus.ARRIVED_AT_OUTLET,
+          items: {
+            create: orderItemsData,
+          },
           paymentDueAt,
         },
       });
 
-      // Create order items
-      await tx.orderItem.createMany({
-        data: dto.items.map((item) => ({
-          orderId: newOrder.id,
-          itemId: item.itemId,
-          qty: item.qty,
-        })),
+      await tx.pickupRequest.update({
+        where: { id: data.pickupRequestId },
+        data: { status: PickupStatus.ARRIVED_OUTLET },
       });
 
-      // Create order stations
       const stations = [
         { stationType: StationType.WASHING },
         { stationType: StationType.IRONING },
@@ -130,96 +126,96 @@ export class OrderService {
 
       return newOrder;
     });
+  };
 
-    // 7. Get full order with relations
-    const fullOrder = await this.prisma.order.findUnique({
-      where: { id: order.id },
+  findAll = async (params: {
+    outletId?: number;
+    page: number;
+    limit: number;
+    sortBy: string;
+    sortOrder: "asc" | "desc";
+    status?: OrderStatus;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const {
+      outletId,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      status,
+      search,
+      startDate,
+      endDate,
+    } = params;
+
+    const skip = (page - 1) * limit;
+
+    const whereClause: any = {};
+
+    if (outletId) {
+      whereClause.outletId = outletId;
+    }
+
+    if (status) {
+      whereClause.orderStatus = status;
+    }
+
+    if (search) {
+      whereClause.orderNo = { contains: search, mode: "insensitive" };
+    }
+
+    if (startDate || endDate) {
+      whereClause.createdAt = {};
+      if (startDate) {
+        whereClause.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        whereClause.createdAt.lte = new Date(endDate);
+      }
+    }
+
+    const orders = await this.prisma.order.findMany({
+      where: whereClause,
       include: {
+        customer: { include: { profile: true } },
         items: {
           include: {
             item: true,
           },
         },
-        outlet: true,
-        customer: {
+        outlet: {
           select: {
             id: true,
-            email: true,
-            profile: {
-              select: {
-                fullName: true,
-                phone: true,
-              },
-            },
+            name: true,
+            addressText: true,
           },
         },
-        stations: true,
+        payments: {
+          where: { status: "PAID" },
+          select: {
+            id: true,
+            paidAt: true,
+          },
+        },
+      },
+      skip: skip,
+      take: limit,
+      orderBy: {
+        [sortBy]: sortOrder,
       },
     });
 
-    // TODO: Send notification to customer about order creation
-
-    return fullOrder;
-  }
-
-  async getOrders(customerId: number, dto: GetOrdersDTO) {
-    const { status, search, startDate, endDate, page = 1, limit = 10 } = dto;
-
-    const where: any = { customerId };
-
-    if (status) {
-      where.status = status;
-    }
-
-    if (search) {
-      where.orderNo = { contains: search, mode: "insensitive" };
-    }
-
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(startDate);
-      }
-      if (endDate) {
-        where.createdAt.lte = new Date(endDate);
-      }
-    }
-
-    const [orders, total] = await Promise.all([
-      this.prisma.order.findMany({
-        where,
-        include: {
-          outlet: {
-            select: {
-              id: true,
-              name: true,
-              addressText: true,
-            },
-          },
-          items: {
-            include: {
-              item: true,
-            },
-          },
-          payments: {
-            where: { status: "PAID" },
-            select: {
-              id: true,
-              paidAt: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.order.count({ where }),
-    ]);
+    const total = await this.prisma.order.count({
+      where: whereClause,
+    });
 
     return {
       data: orders.map((order) => ({
         ...order,
-        deliveryDate: order.deliveredAt, // Alias for FE requirement
+        deliveryDate: order.deliveredAt,
         isPaid: order.payments.length > 0,
         itemCount: order.items.reduce((sum, item) => sum + item.qty, 0),
       })),
@@ -230,7 +226,7 @@ export class OrderService {
         totalPages: Math.ceil(total / limit),
       },
     };
-  }
+  };
 
   async getOrderById(orderId: string, customerId: number) {
     const order = await this.prisma.order.findFirst({
@@ -308,6 +304,18 @@ export class OrderService {
     };
   }
 
+  updateStatus = async (orderId: string, newStatus: OrderStatus) => {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+    if (!order) throw new ApiError("Order tidak ditemukan", 404);
+
+    return await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: newStatus },
+    });
+  };
+
   async confirmOrderReceived(orderId: string, customerId: number) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, customerId },
@@ -382,5 +390,36 @@ export class OrderService {
     // TODO: Send notifications to customers
 
     return { count: ordersToConfirm.length };
+  }
+
+  private readonly adminOrderInclude = {
+    customer: { select: { id: true, email: true, profile: true } },
+    outlet: true,
+    pickupRequest: { include: { address: true } },
+    items: { include: { item: true } },
+    stations: {
+      include: { worker: { include: { profile: true } } },
+      orderBy: { id: "asc" as const },
+    },
+    driverTasks: {
+      include: { driver: { include: { profile: true } } },
+      orderBy: { createdAt: "asc" as const },
+    },
+    payments: { orderBy: { createdAt: "desc" as const } },
+  };
+
+  async getAdminOrderById(orderId: string, role: RoleCode, outletId?: number) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: this.adminOrderInclude,
+    });
+
+    if (!order) throw new ApiError("Order tidak ditemukan", 404);
+
+    if (role === RoleCode.OUTLET_ADMIN && order.outletId !== outletId) {
+      throw new ApiError("Forbidden: Order bukan dari outlet Anda", 403);
+    }
+
+    return order;
   }
 }

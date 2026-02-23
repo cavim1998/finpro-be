@@ -5,20 +5,29 @@ import { PickupIdParamDTO } from "./dto/pickup-id.params.dto.js";
 import { TaskIdParamDTO } from "./dto/task-id.params.dto.js";
 import { OrderIdParamDTO } from "./dto/order-id.params.dto.js";
 import { RoleCode } from "../../../generated/prisma/client.js";
+import { ApiError } from "../../utils/api-error.js";
 
 type LocalsUser = {
-  user: {
-    id: number;
-    role: RoleCode;
-  };
+  user: { sub?: number | string; role?: RoleCode };
 };
 
 export class DriverController {
   constructor(private driverService: DriverService) {}
 
+  private getAuthUser(res: Response<any, LocalsUser>) {
+    const user = (res.locals.user ?? {}) as LocalsUser["user"];
+    const userId = Number(user?.sub);
+    const role = user?.role as RoleCode;
+
+    if (!user?.sub || !Number.isFinite(userId) || !role) {
+      throw new ApiError("Unauthorized", 401);
+    }
+
+    return { userId, role };
+  }
+
   getDashboard = async (req: Request, res: Response<any, LocalsUser>) => {
-    const userId = Number((res.locals.user as any)?.sub);
-    const role = (res.locals.user as any)?.role;
+    const { userId, role } = this.getAuthUser(res);
 
     const data = await this.driverService.getDashboard(
       userId,
@@ -30,7 +39,7 @@ export class DriverController {
   };
 
   claimPickup = async (req: Request, res: Response<any, LocalsUser>) => {
-    const { id: userId, role } = res.locals.user;
+    const { userId, role } = this.getAuthUser(res);
     const { pickupId } = req.params as any as PickupIdParamDTO;
 
     const data = await this.driverService.claimPickup(userId, role, pickupId);
@@ -38,7 +47,7 @@ export class DriverController {
   };
 
   startTask = async (req: Request, res: Response<any, LocalsUser>) => {
-    const { id: userId, role } = res.locals.user;
+    const { userId, role } = this.getAuthUser(res);
     const { taskId } = req.params as any as TaskIdParamDTO;
 
     const data = await this.driverService.startTask(userId, role, taskId);
@@ -46,7 +55,7 @@ export class DriverController {
   };
 
   cancelPickup = async (req: Request, res: Response<any, LocalsUser>) => {
-    const { id: userId, role } = res.locals.user;
+    const { userId, role } = this.getAuthUser(res);
     const { taskId } = req.params as any as TaskIdParamDTO;
 
     const data = await this.driverService.cancelPickup(userId, role, taskId);
@@ -54,7 +63,7 @@ export class DriverController {
   };
 
   pickupPickedUp = async (req: Request, res: Response<any, LocalsUser>) => {
-    const { id: userId, role } = res.locals.user;
+    const { userId, role } = this.getAuthUser(res);
     const { taskId } = req.params as any as TaskIdParamDTO;
 
     const data = await this.driverService.pickupPickedUp(userId, role, taskId);
@@ -62,7 +71,7 @@ export class DriverController {
   };
 
   pickupArrived = async (req: Request, res: Response<any, LocalsUser>) => {
-    const { id: userId, role } = res.locals.user;
+    const { userId, role } = this.getAuthUser(res);
     const { taskId } = req.params as any as TaskIdParamDTO;
 
     const data = await this.driverService.pickupArrivedOutlet(
@@ -74,7 +83,7 @@ export class DriverController {
   };
 
   claimDelivery = async (req: Request, res: Response<any, LocalsUser>) => {
-    const { id: userId, role } = res.locals.user;
+    const { userId, role } = this.getAuthUser(res);
     const { orderId } = req.params as any as OrderIdParamDTO;
 
     const data = await this.driverService.claimDelivery(userId, role, orderId);
@@ -82,7 +91,7 @@ export class DriverController {
   };
 
   completeDelivery = async (req: Request, res: Response<any, LocalsUser>) => {
-    const { id: userId, role } = res.locals.user;
+    const { userId, role } = this.getAuthUser(res);
     const { taskId } = req.params as any as TaskIdParamDTO;
 
     const data = await this.driverService.completeDelivery(

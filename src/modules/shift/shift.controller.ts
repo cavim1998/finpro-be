@@ -5,18 +5,20 @@ export class ShiftController {
   constructor(private shiftService: ShiftService) {}
 
   getShifts = async (req: Request, res: Response) => {
-    const outletId = Number(req.query.outletId);
-    if (!outletId) return res.status(400).send({ error: "Outlet ID required" });
+    const outletId = req.query.outletId
+      ? Number(req.query.outletId)
+      : undefined;
 
-    const result = await this.shiftService.getShifts(outletId);
+    const shift = await this.shiftService.getShifts({
+      search: req.query.search as string,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 10,
+      sortBy: (req.query.sortBy as string) || "name",
+      sortOrder: (req.query.sortOrder as "asc" | "desc") || "asc",
+      outletId,
+    });
 
-    const formatted = result.map((s) => ({
-      ...s,
-      startTime: s.startTime.toISOString().substring(11, 16),
-      endTime: s.endTime.toISOString().substring(11, 16),
-    }));
-
-    res.status(200).send(formatted);
+    res.status(200).send(shift);
   };
 
   createShift = async (req: Request, res: Response) => {

@@ -30,10 +30,18 @@ export class WorkerController {
     res.json({ data });
   };
 
+  getOrderDetail = async (req: Request, res: Response) => {
+    const userId = Number(res.locals.user?.sub);
+    const orderId = String(req.params.orderId);
+
+    const data = await this.workerService.getOrderDetail(userId, orderId);
+    res.json({ data });
+  };
+
   claimOrder = async (req: Request, res: Response) => {
     const userId = Number(res.locals.user?.sub);
     const stationType = req.params.stationType as StationType;
-    const orderId = req.params.orderId;
+    const orderId = String(req.params.orderId);
 
     const data = await this.workerService.claimOrder(
       userId,
@@ -46,7 +54,7 @@ export class WorkerController {
   completeOrderStation = async (req: Request, res: Response) => {
     const userId = Number(res.locals.user?.sub);
     const stationType = req.params.stationType as StationType;
-    const orderId = req.params.orderId;
+    const orderId = String(req.params.orderId);
 
     const { itemCounts } = req.body as {
       itemCounts: Array<{ itemId: number; qty: number }>;
@@ -65,7 +73,7 @@ export class WorkerController {
   bypassOrderStation = async (req: Request, res: Response) => {
     const userId = Number(res.locals.user?.sub);
     const stationType = req.params.stationType as StationType;
-    const orderId = req.params.orderId;
+    const orderId = String(req.params.orderId);
 
     const { reason, itemCounts } = req.body as {
       reason: string;
