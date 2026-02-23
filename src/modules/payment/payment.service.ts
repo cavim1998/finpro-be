@@ -114,7 +114,6 @@ export class PaymentService {
     }
 
     // 5. Create payment with mock gateway integration
-    const grossAmount = Math.max(1, Math.round(Number(order.totalAmount)));
     const paymentAttempt = order.payments.length + 1;
     const gatewayRef =
       paymentAttempt > 1 ? `${order.orderNo}-${paymentAttempt}` : order.orderNo;
@@ -123,9 +122,22 @@ export class PaymentService {
     const itemDetails = order.items.map((orderItem) => ({
       id: String(orderItem.itemId),
       name: orderItem.item.name,
-      quantity: orderItem.qty,
+      quantity: Math.max(1, orderItem.qty),
       price: Math.max(1, Math.round(Number(orderItem.item.price))),
     }));
+
+    const premiumFee =
+      Number(order.totalAmount) -
+      Number(order.subtotalAmount) -
+      Number(order.deliveryFee);
+    if (premiumFee > 0) {
+      itemDetails.push({
+        id: "PREMIUM_FEE",
+        name: "Premium Service Fee",
+        quantity: 1,
+        price: Math.max(1, Math.round(premiumFee)),
+      });
+    }
 
     if (Number(order.deliveryFee) > 0) {
       itemDetails.push({
@@ -135,6 +147,11 @@ export class PaymentService {
         price: Math.max(1, Math.round(Number(order.deliveryFee))),
       });
     }
+
+    const grossAmount = itemDetails.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0,
+    );
 
     const midtransPayload = {
       transaction_details: {
@@ -163,7 +180,7 @@ export class PaymentService {
       data: {
         orderId: dto.orderId,
         provider: "midtrans",
-        amount: order.totalAmount,
+        amount: grossAmount,
         status: PaymentStatus.PENDING,
         gatewayRef,
         payloadJson: {
@@ -205,10 +222,17 @@ export class PaymentService {
     }
 
     // Find order by orderNo
-    const payment = await this.prisma.payment.findUnique({
+    let payment = await this.prisma.payment.findUnique({
       where: { gatewayRef: order_id },
       include: { order: true },
     });
+
+    if (!payment && transaction_id) {
+      payment = await this.prisma.payment.findUnique({
+        where: { gatewayRef: transaction_id },
+        include: { order: true },
+      });
+    }
 
     if (!payment || !payment.order) {
       throw new ApiError("Payment tidak ditemukan", 404);
@@ -249,7 +273,6 @@ export class PaymentService {
         data: {
           status: paymentStatus,
           paidAt: paymentStatus === PaymentStatus.PAID ? new Date() : null,
-          gatewayRef: transaction_id || payment.gatewayRef,
         },
       });
 
