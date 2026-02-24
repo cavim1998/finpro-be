@@ -10,7 +10,7 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const data = await this.userService.getUser(authUser.sub);
+      const data = await this.userService.getUser(parseInt(authUser.sub, 10));
       res.status(200).send({ status: "success", data });
     } catch (err) {
       next(err);
@@ -26,7 +26,7 @@ export class UserController {
         throw new ApiError("Forbidden", 403);
       }
 
-      const data = await this.userService.getUser(req.params.id);
+      const data = await this.userService.getUser(parseInt(req.params.id, 10));
       res.status(200).send({ status: "success", data });
     } catch (err) {
       next(err);
@@ -38,7 +38,9 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const data = await this.userService.getProfile(authUser.sub);
+      const data = await this.userService.getProfile(
+        parseInt(authUser.sub, 10),
+      );
       res.status(200).send({ status: "success", data });
     } catch (err) {
       next(err);
@@ -50,7 +52,10 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const data = await this.userService.updateProfile(authUser.sub, req.body);
+      const data = await this.userService.updateProfile(
+        parseInt(authUser.sub, 10),
+        req.body,
+      );
       res.status(200).send({
         status: "success",
         message: "Profile updated successfully",
@@ -71,7 +76,7 @@ export class UserController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
       const data = await this.userService.updateProfilePhoto(
-        authUser.sub,
+        parseInt(authUser.sub, 10),
         req.file,
       );
       res.status(200).send({
@@ -90,7 +95,7 @@ export class UserController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
       const result = await this.userService.changePassword(
-        authUser.sub,
+        parseInt(authUser.sub, 10),
         req.body,
       );
       res.status(200).send(result);
@@ -104,7 +109,10 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const result = await this.userService.updateEmail(authUser.sub, req.body);
+      const result = await this.userService.updateEmail(
+        parseInt(authUser.sub, 10),
+        req.body,
+      );
       res.status(200).send(result);
     } catch (err) {
       next(err);
@@ -121,7 +129,7 @@ export class UserController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
       const result = await this.userService.requestEmailVerification(
-        authUser.sub,
+        parseInt(authUser.sub, 10),
       );
       res.status(200).send(result);
     } catch (err) {
@@ -140,7 +148,9 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const addresses = await this.userService.getAddresses(authUser.sub);
+      const addresses = await this.userService.getAddresses(
+        parseInt(authUser.sub, 10),
+      );
       res.status(200).send({ status: "success", data: addresses });
     } catch (err) {
       next(err);
@@ -153,7 +163,7 @@ export class UserController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
       const address = await this.userService.createAddress(
-        authUser.sub,
+        parseInt(authUser.sub, 10),
         req.body,
       );
       res.status(201).send({
@@ -177,7 +187,7 @@ export class UserController {
       }
 
       const address = await this.userService.updateAddress(
-        authUser.sub,
+        parseInt(authUser.sub, 10),
         addressId,
         req.body,
       );
@@ -202,7 +212,7 @@ export class UserController {
       }
 
       const result = await this.userService.deleteAddress(
-        authUser.sub,
+        parseInt(authUser.sub, 10),
         addressId,
       );
       res.status(200).send(result);
@@ -226,7 +236,7 @@ export class UserController {
       }
 
       const address = await this.userService.setPrimaryAddress(
-        authUser.sub,
+        parseInt(authUser.sub, 10),
         addressId,
       );
       res.status(200).send({
