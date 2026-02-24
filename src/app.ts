@@ -188,7 +188,7 @@ export class App {
     this.app.use("/payments", paymentRouter.getRouter());
     this.app.use("/driver", driverRouter.getRouter());
     this.app.use("/worker", workerRouter.getRouter());
-    this.app.use("/bypass", bypassRouter.getRouter());
+    this.app.use("/bypass-requests", bypassRouter.getRouter());
     this.app.use("/reports", reportRouter.getRouter());
     this.app.use("/dashboard", dashboardRouter.getRouter());
   }

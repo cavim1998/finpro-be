@@ -37,7 +37,7 @@ export class OrderRouter {
     this.router.post(
       "/",
       verifyToken(JWT_SECRET),
-      authorizeRole([RoleCode.OUTLET_ADMIN]),
+      authorizeRole([RoleCode.OUTLET_ADMIN, RoleCode.SUPER_ADMIN]),
       this.validationMiddleware.validateBody(CreateOrderDTO),
       this.orderController.create,
     );
