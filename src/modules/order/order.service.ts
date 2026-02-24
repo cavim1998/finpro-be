@@ -9,6 +9,7 @@ import {
 } from "../../../generated/prisma/client.js";
 import { CreateOrderDTO } from "./dto/create-order.dto.js";
 import { ApiError } from "../../utils/api-error.js";
+import { OrderWhereInput } from "../../../generated/prisma/models.js";
 
 export class OrderService {
   constructor(private prisma: PrismaClient) {}
@@ -155,14 +156,14 @@ export class OrderService {
 
     const skip = (page - 1) * limit;
 
-    const whereClause: any = {};
+    const whereClause: OrderWhereInput = {};
 
     if (outletId) {
       whereClause.outletId = outletId;
     }
 
     if (status) {
-      whereClause.orderStatus = status;
+      whereClause.status = status;
     }
 
     if (search) {

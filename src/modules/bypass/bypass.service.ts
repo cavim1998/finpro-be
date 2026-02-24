@@ -12,13 +12,14 @@ interface FindAllParams {
   sortBy: string;
   sortOrder: "asc" | "desc";
   status?: string;
+  search?: string;
 }
 
 export class BypassService {
   constructor(private prisma: PrismaClient) {}
 
   findAll = async (params: FindAllParams) => {
-    const { outletId, page, limit, sortBy, sortOrder, status } = params;
+    const { outletId, page, limit, sortBy, sortOrder, status, search } = params;
     const skip = (page - 1) * limit;
 
     const where: Prisma.BypassRequestWhereInput = {};
@@ -33,6 +34,40 @@ export class BypassService {
           outletId: outletId,
         },
       };
+    }
+
+    let orderByClause: any = {};
+
+    if (sortBy === "name") {
+      orderByClause = {
+        requestedBy: {
+          profile: {
+            fullName: sortOrder,
+          },
+        },
+      };
+    } else if (sortBy === "orderNo") {
+      orderByClause = {
+        orderStation: {
+          order: {
+            orderNo: sortOrder,
+          },
+        },
+      };
+    } else {
+      const validColumns = [
+        "id",
+        "status",
+        "requestedAt",
+        "decidedAt",
+        "reason",
+      ];
+
+      if (validColumns.includes(sortBy)) {
+        orderByClause = { [sortBy]: sortOrder };
+      } else {
+        orderByClause = { requestedAt: "desc" };
+      }
     }
 
     const requests = await this.prisma.bypassRequest.findMany({

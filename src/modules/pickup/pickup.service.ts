@@ -30,6 +30,31 @@ export class PickupService {
       where.status = status as PickupStatus;
     }
 
+    let orderByClause: any = {};
+
+    if (sortBy === "name") {
+      orderByClause = {
+        customer: {
+          profile: {
+            fullName: sortOrder,
+          },
+        },
+      };
+    } else {
+      const validColumns = [
+        "createdAt",
+        "updatedAt",
+        "status",
+        "scheduledPickupAt",
+      ];
+
+      if (validColumns.includes(sortBy)) {
+        orderByClause = { [sortBy]: sortOrder };
+      } else {
+        orderByClause = { createdAt: "desc" };
+      }
+    }
+
     const requests = await this.prisma.pickupRequest.findMany({
       where,
       include: {
