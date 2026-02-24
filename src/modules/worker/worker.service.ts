@@ -3,6 +3,7 @@ import {
   StationType,
   OrderStatus,
   BypassStatus,
+  PaymentStatus,
 } from "../../../generated/prisma/enums.js";
 import { prisma } from "../../lib/prisma.js";
 import { ApiError } from "../../utils/api-error.js";
@@ -461,9 +462,30 @@ export class WorkerService {
         },
       });
 
+      // Determine final order status
+      let finalOrderStatus = nextOrderStatusByStation(stationType);
+
+      // Jika packing selesai, cek apakah customer sudah bayar
+      // Jika sudah bayar, kirim langsung ke READY_TO_DELIVER, bukan WAITING_PAYMENT
+      if (
+        stationType === StationType.PACKING &&
+        finalOrderStatus === OrderStatus.WAITING_PAYMENT
+      ) {
+        const paidPayment = await tx.payment.findFirst({
+          where: {
+            orderId: station.orderId,
+            status: PaymentStatus.PAID,
+          },
+        });
+
+        if (paidPayment) {
+          finalOrderStatus = OrderStatus.READY_TO_DELIVER;
+        }
+      }
+
       await tx.order.update({
         where: { id: station.orderId },
-        data: { status: nextOrderStatusByStation(stationType) },
+        data: { status: finalOrderStatus },
       });
 
       return updated;

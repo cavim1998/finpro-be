@@ -1,28 +1,40 @@
 import { PrismaClient, Prisma } from "../../../generated/prisma/client.js";
+import { CloudinaryService } from "../cloudinary/cloudinary.service.js";
 import { ApiError } from "../../utils/api-error.js";
 import { CreateOutletDto } from "./dto/create-outlet.dto.js";
 import { UpdateOutletDto } from "./dto/update-outlet.dto.js";
 
 export class OutletService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(
+    private prisma: PrismaClient,
+    private cloudinaryService: CloudinaryService,
+  ) {}
 
   getAllOutlets = async (params: {
     page: number;
     limit: number;
     search?: string;
+    locationCategory?: string;
     sortBy: string;
     sortOrder: "asc" | "desc";
   }) => {
     const skip = (params.page - 1) * params.limit;
 
-    const where: Prisma.OutletWhereInput = params.search
-      ? {
-          OR: [
-            { name: { contains: params.search, mode: "insensitive" } },
-            { addressText: { contains: params.search, mode: "insensitive" } },
-          ],
-        }
-      : {};
+    const where: Prisma.OutletWhereInput = {};
+
+    if (params.search) {
+      where.OR = [
+        { name: { contains: params.search, mode: "insensitive" } },
+        { addressText: { contains: params.search, mode: "insensitive" } },
+      ];
+    }
+
+    if (params.locationCategory) {
+      where.location_category = {
+        equals: params.locationCategory,
+        mode: "insensitive",
+      };
+    }
 
     const data = await this.prisma.outlet.findMany({
       where,
@@ -39,7 +51,11 @@ export class OutletService {
     const total = await this.prisma.outlet.count({ where });
 
     return {
-      data,
+      data: data.map((outlet) => ({
+        ...outlet,
+        locationCategory: outlet.location_category ?? undefined,
+        location_category: undefined,
+      })),
       meta: {
         page: params.page,
         take: params.limit,
@@ -50,7 +66,7 @@ export class OutletService {
   };
 
   getOutletById = async (id: number) => {
-    const getOutlet = this.prisma.outlet.findUnique({
+    const getOutlet = await this.prisma.outlet.findUnique({
       where: { id },
       include: {
         staff: true,
@@ -59,7 +75,11 @@ export class OutletService {
 
     if (!getOutlet) throw new ApiError("Outlet not found", 404);
 
-    return getOutlet;
+    return {
+      ...getOutlet,
+      locationCategory: getOutlet.location_category ?? undefined,
+      location_category: undefined,
+    };
   };
 
   createOutlet = async (body: CreateOutletDto) => {
@@ -69,6 +89,7 @@ export class OutletService {
         addressText: body.addressText,
         latitude: body.latitude,
         longitude: body.longitude,
+        location_category: body.locationCategory,
       },
     });
   };
@@ -77,8 +98,35 @@ export class OutletService {
     await this.getOutletById(id);
     return await this.prisma.outlet.update({
       where: { id },
-      data: body,
+      data: {
+        name: body.name,
+        addressText: body.addressText,
+        latitude: body.latitude,
+        longitude: body.longitude,
+        location_category: body.locationCategory,
+      },
     });
+  };
+
+  updateOutletPhoto = async (id: number, file?: Express.Multer.File) => {
+    if (!file) {
+      throw new ApiError("Invalid file type or size", 400, "INVALID_FILE");
+    }
+
+    const outlet = await this.getOutletById(id);
+
+    if (outlet?.photoUrl) {
+      await this.cloudinaryService.remove(outlet.photoUrl);
+    }
+
+    const uploadResult = await this.cloudinaryService.upload(file);
+
+    await this.prisma.outlet.update({
+      where: { id },
+      data: { photoUrl: uploadResult.secure_url },
+    });
+
+    return { url: uploadResult.secure_url };
   };
 
   deleteOutlet = async (id: number) => {

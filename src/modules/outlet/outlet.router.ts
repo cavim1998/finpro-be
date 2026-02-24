@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { ValidationMiddleware } from "../../middlewares/validation.middleware.js";
+import { UploaderMiddleware } from "../../middlewares/uploader.middleware.js";
 import { CreateOutletDto } from "./dto/create-outlet.dto.js";
 // import { UpdateOutletDTO } from "./dto/update-outlet.dto.js";
 import { OutletController } from "./outlet.controller.js";
@@ -11,6 +12,7 @@ export class OutletRouter {
   constructor(
     private outletController: OutletController,
     private validationMiddleware: ValidationMiddleware,
+    private uploaderMiddleware: UploaderMiddleware,
   ) {
     this.router = Router();
     this.initializedRoutes();
@@ -30,6 +32,12 @@ export class OutletRouter {
       "/:id",
       this.validationMiddleware.validateBody(UpdateOutletDto),
       this.outletController.updateOutlet,
+    );
+
+    this.router.patch(
+      "/:id/photo",
+      this.uploaderMiddleware.upload().single("file"),
+      this.outletController.uploadOutletPhoto,
     );
 
     this.router.delete("/:id", this.outletController.deleteOutlet);

@@ -54,7 +54,7 @@ export class PaymentRouter {
       this.paymentController.mockPaymentSuccess,
     );
 
-    // Upload payment proof (QRIS receipt image)
+    // Upload payment proof (QRIS receipt image) //TIDAK PERLU
     this.router.post(
       "/:paymentId/upload-proof",
       verifyToken(JWT_SECRET),
