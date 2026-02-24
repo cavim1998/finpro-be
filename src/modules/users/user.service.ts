@@ -26,7 +26,7 @@ export class UserService {
     return users.map(({ passwordHash, ...rest }) => rest);
   };
 
-  getUser = async (id: string) => {
+  getUser = async (id: number) => {
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: { profile: true, addresses: true },
@@ -50,7 +50,7 @@ export class UserService {
     };
   };
 
-  getProfile = async (userId: string) => {
+  getProfile = async (userId: number) => {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { profile: true, addresses: true },
@@ -74,7 +74,7 @@ export class UserService {
     };
   };
 
-  updateProfile = async (userId: string, data: UpdateProfileDTO) => {
+  updateProfile = async (userId: number, data: UpdateProfileDTO) => {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { profile: true },
@@ -138,7 +138,7 @@ export class UserService {
     };
   };
 
-  updateProfilePhoto = async (userId: string, file?: Express.Multer.File) => {
+  updateProfilePhoto = async (userId: number, file?: Express.Multer.File) => {
     if (!file) {
       throw new ApiError("Invalid file type or size", 400, "INVALID_FILE");
     }
@@ -172,7 +172,7 @@ export class UserService {
     return { url: uploadResult.secure_url };
   };
 
-  changePassword = async (userId: string, data: ChangePasswordDTO) => {
+  changePassword = async (userId: number, data: ChangePasswordDTO) => {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -221,7 +221,7 @@ export class UserService {
     };
   };
 
-  updateEmail = async (userId: string, data: UpdateEmailDTO) => {
+  updateEmail = async (userId: number, data: UpdateEmailDTO) => {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { profile: true },
@@ -311,7 +311,7 @@ export class UserService {
     };
   };
 
-  requestEmailVerification = async (userId: string) => {
+  requestEmailVerification = async (userId: number) => {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { profile: true },
@@ -368,7 +368,7 @@ export class UserService {
    * =========================
    */
 
-  getAddresses = async (userId: string) => {
+  getAddresses = async (userId: number) => {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -383,7 +383,7 @@ export class UserService {
     return addresses;
   };
 
-  createAddress = async (userId: string, data: CreateAddressDTO) => {
+  createAddress = async (userId: number, data: CreateAddressDTO) => {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -420,7 +420,7 @@ export class UserService {
   };
 
   updateAddress = async (
-    userId: string,
+    userId: number,
     addressId: number,
     data: UpdateAddressDTO,
   ) => {
@@ -471,7 +471,7 @@ export class UserService {
     return updatedAddress;
   };
 
-  deleteAddress = async (userId: string, addressId: number) => {
+  deleteAddress = async (userId: number, addressId: number) => {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -519,7 +519,7 @@ export class UserService {
     };
   };
 
-  setPrimaryAddress = async (userId: string, addressId: number) => {
+  setPrimaryAddress = async (userId: number, addressId: number) => {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
