@@ -9,6 +9,7 @@ export class OutletController {
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 10,
       search: req.query.search as string,
+      locationCategory: req.query.locationCategory as string,
       sortBy: (req.query.sortBy as string) || "createdAt",
       sortOrder: (req.query.sortOrder as "asc" | "desc") || "desc",
     });
@@ -37,6 +38,15 @@ export class OutletController {
     const id = Number(req.params.id);
     const result = await this.outletService.updateOutlet(id, req.body);
     res.status(200).send(result);
+  };
+
+  uploadOutletPhoto = async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const result = await this.outletService.updateOutletPhoto(id, req.file);
+    res.status(200).send({
+      message: "Outlet photo uploaded successfully",
+      data: result,
+    });
   };
 
   deleteOutlet = async (req: Request, res: Response) => {

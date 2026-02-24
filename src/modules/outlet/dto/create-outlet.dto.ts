@@ -28,4 +28,8 @@ export class CreateOutletDto {
   @IsLongitude()
   @Type(() => Number)
   longitude?: number;
+
+  @IsOptional()
+  @IsString()
+  locationCategory?: string;
 }

@@ -2,6 +2,7 @@ import { PrismaClient } from "../../../generated/prisma/client.js";
 import {
   BypassStatus,
   OrderStatus,
+  PaymentStatus,
   RoleCode,
   StationStatus,
   StationType,
@@ -243,10 +244,31 @@ export class WorkerStationsService {
         },
       });
 
-      if (nextStatus) {
+      // Determine final order status
+      let finalOrderStatus = nextStatus;
+
+      // Jika packing selesai, cek apakah customer sudah bayar
+      // Jika sudah bayar, kirim langsung ke READY_TO_DELIVER, bukan WAITING_PAYMENT
+      if (
+        stationType === StationType.PACKING &&
+        nextStatus === OrderStatus.WAITING_PAYMENT
+      ) {
+        const paidPayment = await tx.payment.findFirst({
+          where: {
+            orderId,
+            status: PaymentStatus.PAID,
+          },
+        });
+
+        if (paidPayment) {
+          finalOrderStatus = OrderStatus.READY_TO_DELIVER;
+        }
+      }
+
+      if (finalOrderStatus) {
         await tx.order.update({
           where: { id: orderId },
-          data: { status: nextStatus },
+          data: { status: finalOrderStatus },
         });
       }
 

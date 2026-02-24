@@ -276,13 +276,17 @@ export class PaymentService {
         },
       });
 
-      // If payment successful, update order and create delivery task
+      // If payment successful, update payment ONLY
+      // Worker-stations logic akan handle status progression saat packing selesai
+      // Jika sudah ada PAID payment, status langsung ke READY_TO_DELIVER
+      // Jika belum, status jadi WAITING_PAYMENT lalu customer bayar
       if (orderNeedsUpdate && paymentStatus === PaymentStatus.PAID) {
         // Update order
         await tx.order.update({
           where: { id: order.id },
           data: {
-            status: OrderStatus.READY_TO_DELIVER,
+            // JANGAN update status di sini!
+            // Status progression di-handle oleh worker-stations saat packing selesai
             paidAt: new Date(),
           },
         });
