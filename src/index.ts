@@ -1,8 +1,13 @@
 import { App } from "./app.js";
 
-const main = () => {
-  const app = new App();
-  app.start();
-};
+const mainApp = new App();
+const app = mainApp.app;
 
-main();
+export default app;
+
+if (process.env.NODE_ENV !== "production") {
+  const port = process.env.PORT || 8000;
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+}
