@@ -99,7 +99,6 @@ export class DriverService {
     }
   }
 
-  // GET /driver/dashboard
   async getDashboard(
     userId: number,
     role: RoleCode,
@@ -637,7 +636,7 @@ export class DriverService {
           id: taskId,
           driverId: userId,
           taskType: "DELIVERY",
-          status: "IN_PROGRESS",
+          status: "ASSIGNED",
         },
       });
 
