@@ -91,16 +91,15 @@ export class App {
     //     allowedHeaders: "Content-Type, Authorization",
     //   }),
     // );
-    this.app.use(
-      cors({
-        origin: ["http://localhost:3000", "https://finpro-fe.vercel.app"],
-        methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], //ikutin atas
-        allowedHeaders: ["Content-Type", "Authorization"],
-        credentials: true,
-      }),
-    );
+    const corsOptions = {
+      origin: ["http://localhost:3000", "https://finpro-fe.vercel.app"],
+      methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+      credentials: true,
+    };
 
-    this.app.options("*", cors());
+    this.app.use(cors(corsOptions));
+    this.app.options("*", cors(corsOptions));
     this.app.use(loggerHttp);
     this.app.use(express.json());
   }
@@ -234,3 +233,7 @@ export class App {
     });
   }
 }
+
+const appInstance = new App();
+
+export default appInstance.app;
