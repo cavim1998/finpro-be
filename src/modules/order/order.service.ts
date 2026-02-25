@@ -47,7 +47,8 @@ export class OrderService {
       }
 
       let subtotal = 0;
-      const orderItemsData = [];
+      const orderItemsData: { itemId: number; qty: number; price: number }[] =
+        [];
 
       for (const itemDto of data.items) {
         const itemMaster = await tx.laundryItem.findUnique({
