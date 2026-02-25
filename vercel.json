@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/src/index.js"
+      "destination": "/dist/index.js"
     }
   ],
   "headers": [
