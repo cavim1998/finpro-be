@@ -93,7 +93,7 @@ export class App {
       cloudinaryService,
       mailService,
     );
-    const outletService = new OutletService(prismaClient);
+    const outletService = new OutletService(prismaClient, cloudinaryService);
     const laundryItemService = new LaundryItemService(prismaClient);
     const employeeService = new EmployeeService(prismaClient);
     const shiftService = new ShiftService(prismaClient);
@@ -141,6 +141,7 @@ export class App {
     const outletRouter = new OutletRouter(
       outletController,
       validationMiddleware,
+      uploaderMiddleware,
     );
     const laundryItemRouter = new LaundryItemRouter(
       laundryItemController,

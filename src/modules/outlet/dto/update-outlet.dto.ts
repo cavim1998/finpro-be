@@ -27,4 +27,8 @@ export class UpdateOutletDto {
   @IsLongitude()
   @Type(() => Number)
   longitude?: number;
+
+  @IsOptional()
+  @IsString()
+  locationCategory?: string;
 }
