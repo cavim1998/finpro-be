@@ -18,8 +18,6 @@ export class PickupController {
 
       let outletId: number | undefined;
 
-      console.log(user);
-
       if (user.role === RoleCode.SUPER_ADMIN) {
         if (req.query.outletId) {
           outletId = Number(req.query.outletId);
@@ -27,9 +25,13 @@ export class PickupController {
       } else {
         outletId = user.outletId;
         if (!outletId) {
-          return res
-            .status(400)
-            .send({ error: "Unauthorized: User missing Outlet ID" });
+          return res.status(400).send({
+            error: "Unauthorized: User missing Outlet ID",
+            debug_user: user, // <--- Kita kirim object user ke frontend
+            debug_outletId: outletId, // <--- Kita lihat nilai aslinya apa (0/null/undefined?)
+            debug_message:
+              "Jika outletId 0, berarti User belum di-assign di tabel OutletStaff",
+          });
         }
       }
 
