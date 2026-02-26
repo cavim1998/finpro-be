@@ -18,6 +18,8 @@ export class PickupController {
 
       let outletId: number | undefined;
 
+      console.log(user);
+
       if (user.role === RoleCode.SUPER_ADMIN) {
         if (req.query.outletId) {
           outletId = Number(req.query.outletId);
