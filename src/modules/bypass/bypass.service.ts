@@ -3,6 +3,8 @@ import {
   Prisma,
   BypassStatus,
   StationStatus,
+  StationType,
+  OrderStatus,
 } from "../../../generated/prisma/client.js";
 
 interface FindAllParams {
@@ -13,6 +15,20 @@ interface FindAllParams {
   sortOrder: "asc" | "desc";
   status?: string;
   search?: string;
+}
+
+// urutan status order setelah station selesai
+function nextOrderStatusByStation(stationType: StationType): OrderStatus {
+  switch (stationType) {
+    case "WASHING":
+      return OrderStatus.IRONING;
+    case "IRONING":
+      return OrderStatus.PACKING;
+    case "PACKING":
+      return OrderStatus.WAITING_PAYMENT;
+    default:
+      return OrderStatus.ARRIVED_AT_OUTLET;
+  }
 }
 
 export class BypassService {
@@ -172,6 +188,21 @@ export class BypassService {
             status: StationStatus.COMPLETED,
             completedAt: new Date(),
           },
+        });
+
+        const detailOrderStation = await tx.orderStation.findUnique({
+          where: { id: request.orderStationId },
+        });
+
+        if (!detailOrderStation) throw new Error("Order Station Not Found");
+
+        let finalOrderStatus = nextOrderStatusByStation(
+          detailOrderStation.stationType,
+        );
+
+        await tx.order.update({
+          where: { id: detailOrderStation.orderId },
+          data: { status: finalOrderStatus },
         });
 
         return {
