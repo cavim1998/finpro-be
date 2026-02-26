@@ -11,13 +11,15 @@ interface FindAllParams {
   sortBy: string;
   sortOrder: "asc" | "desc";
   status?: string;
+  isOrderCreated?: string;
 }
 
 export class PickupService {
   constructor(private prisma: PrismaClient) {}
 
   findAll = async (params: FindAllParams) => {
-    const { outletId, page, limit, sortBy, sortOrder, status } = params;
+    const { outletId, page, limit, sortBy, sortOrder, status, isOrderCreated } =
+      params;
     const skip = (page - 1) * limit;
 
     const where: Prisma.PickupRequestWhereInput = {};
@@ -28,6 +30,12 @@ export class PickupService {
 
     if (status) {
       where.status = status as PickupStatus;
+    }
+
+    if (isOrderCreated === "true") {
+      where.order = { isNot: null };
+    } else if (isOrderCreated === "false") {
+      where.order = { is: null };
     }
 
     let orderByClause: any = {};
@@ -63,12 +71,11 @@ export class PickupService {
         },
         address: true,
         outlet: true,
+        order: { select: { id: true, orderNo: true } },
       },
       skip,
       take: limit,
-      orderBy: {
-        [sortBy]: sortOrder,
-      },
+      orderBy: orderByClause,
     });
 
     const total = await this.prisma.pickupRequest.count({ where });
