@@ -55,7 +55,7 @@ export class PaymentController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
       const customerId = parseInt(authUser.sub);
 
-      const { orderId } = req.params;
+      const { orderId } = req.params as { orderId: string };
 
       const result = await this.paymentService.getPaymentsByOrder(
         orderId,
@@ -78,7 +78,7 @@ export class PaymentController {
     next: NextFunction,
   ) => {
     try {
-      const { orderId } = req.params;
+      const { orderId } = req.params as { orderId: string };
       const result = await this.paymentService.mockPaymentSuccess(orderId);
 
       res.status(200).json(result);
@@ -98,7 +98,7 @@ export class PaymentController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
       const customerId = parseInt(authUser.sub);
 
-      const { paymentId } = req.params;
+      const { paymentId } = req.params as { paymentId: string };
       const file = req.file;
 
       if (!file) {

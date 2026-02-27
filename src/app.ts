@@ -1,7 +1,7 @@
 import cors from "cors";
 import express, { Express } from "express";
 import "reflect-metadata";
-import { PORT } from "./config/env.js";
+import { FE_URL, PORT } from "./config/env.js";
 import { loggerHttp } from "./lib/logger-http.js";
 import { prisma } from "./lib/prisma.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
@@ -70,36 +70,15 @@ export class App {
   }
 
   private configure() {
-    // const allowedOrigins = [
-    //   "http://localhost:3000",
-    //   "https://finpro-fe.vercel.app",
-    // ];
-    // this.app.use(
-    //   cors({
-    //     origin: function (origin, callback) {
-    //       if (!origin) return callback(null, true);
-
-    //       if (allowedOrigins.indexOf(origin) === -1) {
-    //         const msg =
-    //           "The CORS policy for this site does not allow access from the specified Origin.";
-    //         return callback(new Error(msg), false);
-    //       }
-    //       return callback(null, true);
-    //     },
-    //     credentials: true,
-    //     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-    //     allowedHeaders: "Content-Type, Authorization",
-    //   }),
-    // );
     const corsOptions = {
-      origin: ["http://localhost:3000", "https://finpro-fe.vercel.app"],
+      origin: ["http://localhost:3000", FE_URL],
       methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
       credentials: true,
     };
 
     this.app.use(cors(corsOptions));
-    this.app.options("*", cors(corsOptions));
+    // this.app.options("*", cors(corsOptions));
     this.app.use(loggerHttp);
     this.app.use(express.json());
   }
@@ -233,7 +212,3 @@ export class App {
     });
   }
 }
-
-const appInstance = new App();
-
-export default appInstance.app;

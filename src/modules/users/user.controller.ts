@@ -181,7 +181,7 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const addressId = parseInt(req.params.id, 10);
+      const addressId = parseInt(req.params.id as string, 10);
       if (isNaN(addressId)) {
         throw new ApiError("Invalid address ID", 400, "INVALID_ADDRESS_ID");
       }
@@ -206,7 +206,7 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const addressId = parseInt(req.params.id, 10);
+      const addressId = parseInt(req.params.id as string, 10);
       if (isNaN(addressId)) {
         throw new ApiError("Invalid address ID", 400, "INVALID_ADDRESS_ID");
       }
@@ -230,7 +230,7 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const addressId = parseInt(_req.params.id, 10);
+      const addressId = parseInt(_req.params.id as string, 10);
       if (isNaN(addressId)) {
         throw new ApiError("Invalid address ID", 400, "INVALID_ADDRESS_ID");
       }
