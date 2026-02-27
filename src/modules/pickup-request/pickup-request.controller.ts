@@ -66,7 +66,7 @@ export class PickupRequestController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
       const customerId = parseInt(authUser.sub);
 
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       const result = await this.pickupRequestService.getPickupRequestById(
         id,

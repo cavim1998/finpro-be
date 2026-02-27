@@ -36,6 +36,9 @@ import { ShiftService } from "./modules/shift/shift.service.js";
 import { UserController } from "./modules/users/user.controller.js";
 import { UserRouter } from "./modules/users/user.router.js";
 import { UserService } from "./modules/users/user.service.js";
+import { UserProfileService } from "./modules/users/user-profile.service.js";
+import { UserAddressService } from "./modules/users/user-address.service.js";
+import { UserEmailService } from "./modules/users/user-email.service.js";
 import { OrderService } from "./modules/order/order.service.js";
 import { OrderController } from "./modules/order/order.controller.js";
 import { OrderRouter } from "./modules/order/order.router.js";
@@ -95,11 +98,13 @@ export class App {
       cloudinaryService,
       mailService,
     );
-    const userService = new UserService(
+    const userService = new UserService(prismaClient);
+    const userProfileService = new UserProfileService(
       prismaClient,
       cloudinaryService,
-      mailService,
     );
+    const userAddressService = new UserAddressService(prismaClient);
+    const userEmailService = new UserEmailService(prismaClient, mailService);
     const outletService = new OutletService(prismaClient, cloudinaryService);
     const laundryItemService = new LaundryItemService(prismaClient);
     const employeeService = new EmployeeService(prismaClient);
@@ -116,7 +121,12 @@ export class App {
     // controllers
     const sampleController = new SampleController(sampleService);
     const authController = new AuthController(authService);
-    const userController = new UserController(userService);
+    const userController = new UserController(
+      userService,
+      userProfileService,
+      userAddressService,
+      userEmailService,
+    );
     const outletController = new OutletController(outletService);
     const laundryItemController = new LaundryItemController(laundryItemService);
     const employeeController = new EmployeeController(employeeService);

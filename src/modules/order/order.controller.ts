@@ -80,7 +80,7 @@ export class OrderController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
       const customerId = parseInt(authUser.sub);
 
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       const result = await this.orderService.getOrderById(id, customerId);
 
@@ -99,7 +99,7 @@ export class OrderController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
       const customerId = parseInt(authUser.sub);
 
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       // Optional: validate status from body if provided
       const { status } = req.body || {};
@@ -131,7 +131,7 @@ export class OrderController {
   ) => {
     try {
       const user = res.locals.user;
-      const { id } = req.params;
+      const { id } = req.params as { id: string };
 
       const result = await this.orderService.getAdminOrderById(
         id,

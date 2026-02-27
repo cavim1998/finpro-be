@@ -1,9 +1,17 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../../utils/api-error.js";
 import { UserService } from "./user.service.js";
+import { UserProfileService } from "./user-profile.service.js";
+import { UserAddressService } from "./user-address.service.js";
+import { UserEmailService } from "./user-email.service.js";
 
 export class UserController {
-  constructor(private userService: UserService) {}
+  constructor(
+    private userService: UserService,
+    private userProfileService: UserProfileService,
+    private userAddressService: UserAddressService,
+    private userEmailService: UserEmailService,
+  ) {}
 
   getUsers = async (_req: Request, res: Response, next: NextFunction) => {
     try {
@@ -52,7 +60,7 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const data = await this.userService.updateProfile(
+      const data = await this.userProfileService.updateProfile(
         parseInt(authUser.sub, 10),
         req.body,
       );
@@ -75,7 +83,7 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const data = await this.userService.updateProfilePhoto(
+      const data = await this.userProfileService.updateProfilePhoto(
         parseInt(authUser.sub, 10),
         req.file,
       );
@@ -94,7 +102,7 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const result = await this.userService.changePassword(
+      const result = await this.userEmailService.changePassword(
         parseInt(authUser.sub, 10),
         req.body,
       );
@@ -109,7 +117,7 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const result = await this.userService.updateEmail(
+      const result = await this.userEmailService.updateEmail(
         parseInt(authUser.sub, 10),
         req.body,
       );
@@ -128,7 +136,7 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const result = await this.userService.requestEmailVerification(
+      const result = await this.userEmailService.requestEmailVerification(
         parseInt(authUser.sub, 10),
       );
       res.status(200).send(result);
@@ -148,7 +156,7 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const addresses = await this.userService.getAddresses(
+      const addresses = await this.userAddressService.getAddresses(
         parseInt(authUser.sub, 10),
       );
       res.status(200).send({ status: "success", data: addresses });
@@ -162,7 +170,7 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const address = await this.userService.createAddress(
+      const address = await this.userAddressService.createAddress(
         parseInt(authUser.sub, 10),
         req.body,
       );
@@ -181,12 +189,12 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const addressId = parseInt(req.params.id, 10);
+      const addressId = parseInt(req.params.id as string, 10);
       if (isNaN(addressId)) {
         throw new ApiError("Invalid address ID", 400, "INVALID_ADDRESS_ID");
       }
 
-      const address = await this.userService.updateAddress(
+      const address = await this.userAddressService.updateAddress(
         parseInt(authUser.sub, 10),
         addressId,
         req.body,
@@ -206,12 +214,12 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const addressId = parseInt(req.params.id, 10);
+      const addressId = parseInt(req.params.id as string, 10);
       if (isNaN(addressId)) {
         throw new ApiError("Invalid address ID", 400, "INVALID_ADDRESS_ID");
       }
 
-      const result = await this.userService.deleteAddress(
+      const result = await this.userAddressService.deleteAddress(
         parseInt(authUser.sub, 10),
         addressId,
       );
@@ -230,12 +238,12 @@ export class UserController {
       const authUser = res.locals.user as { sub?: string };
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
 
-      const addressId = parseInt(_req.params.id, 10);
+      const addressId = parseInt(_req.params.id as string, 10);
       if (isNaN(addressId)) {
         throw new ApiError("Invalid address ID", 400, "INVALID_ADDRESS_ID");
       }
 
-      const address = await this.userService.setPrimaryAddress(
+      const address = await this.userAddressService.setPrimaryAddress(
         parseInt(authUser.sub, 10),
         addressId,
       );

@@ -75,10 +75,6 @@ export class PickupRequestService {
       },
     });
 
-    // NOTE: DriverTask will be created by driver module when driver is ready to accept
-    // Driver module needs to query PickupRequest with status WAITING_DRIVER
-    // and create DriverTask with valid driverId when accepting
-
     // TODO: Send notification to drivers at this outlet
 
     return {
