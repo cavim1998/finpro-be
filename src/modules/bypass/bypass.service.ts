@@ -181,9 +181,9 @@ export class BypassService {
             },
           });
 
-          if (existingCount) {
-            await tx.stationItemCount.update({
-              where: { id: existingCount.id },
+          if (existingOrderItem) {
+            await tx.orderItem.update({
+              where: { id: existingOrderItem.id },
               data: { qty: diff.currentQty },
             });
           }
