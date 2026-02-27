@@ -174,10 +174,17 @@ export class BypassService {
             },
           });
 
+          const existingOrderItem = await tx.orderItem.findFirst({
+            where: {
+              orderId: request.orderStation.orderId,
+              itemId: diff.itemId,
+            },
+          });
+
           if (existingCount) {
             await tx.stationItemCount.update({
               where: { id: existingCount.id },
-              data: { qty: diff.currentQty }, // Pakai qty riil temuan worker
+              data: { qty: diff.currentQty },
             });
           }
         }
