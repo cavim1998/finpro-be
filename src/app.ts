@@ -78,7 +78,6 @@ export class App {
     };
 
     this.app.use(cors(corsOptions));
-    // this.app.options("*", cors(corsOptions));
     this.app.use(loggerHttp);
     this.app.use(express.json());
   }

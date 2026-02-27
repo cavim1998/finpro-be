@@ -14,6 +14,7 @@ export class PickupController {
       const sortBy = (req.query.sortBy as string) || "createdAt";
       const sortOrder = (req.query.sortOrder as "asc" | "desc") || "desc";
       const status = req.query.status as string | undefined;
+      const isOrderCreated = req.query.isOrderCreated as string | undefined;
 
       let outletId: number | undefined;
 
@@ -37,6 +38,7 @@ export class PickupController {
         sortBy,
         sortOrder,
         status,
+        isOrderCreated,
       });
 
       res.send(result);
