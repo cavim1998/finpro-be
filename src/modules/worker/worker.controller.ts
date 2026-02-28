@@ -16,12 +16,14 @@ export class WorkerController {
   getStationOrders = async (req: Request, res: Response) => {
     const userId = Number(res.locals.user?.sub);
     const stationType = req.params.stationType as StationType;
+    const outletId = Number(req.params.outletId);
 
     const { scope = "my", page = 1, limit = 5 } = req.query as any;
 
     const data = await this.workerService.getOrders(
       userId,
       stationType,
+      outletId,
       scope,
       Number(page),
       Number(limit),
@@ -35,6 +37,19 @@ export class WorkerController {
     const orderId = String(req.params.orderId);
 
     const data = await this.workerService.getOrderDetail(userId, orderId);
+    res.json({ data });
+  };
+
+  getTaskHistory = async (req: Request, res: Response) => {
+    const userId = Number(res.locals.user?.sub);
+    const { page = 1, limit = 10 } = req.query as any;
+
+    const data = await this.workerService.getTaskHistory(
+      userId,
+      Number(page),
+      Number(limit),
+    );
+
     res.json({ data });
   };
 

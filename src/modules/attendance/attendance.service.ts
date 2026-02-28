@@ -11,7 +11,7 @@ export class AttendanceService {
     // en-CA => YYYY-MM-DD
     return new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
   };
-  //hello world
+
   private getTodayDate = (timeZone = DEFAULT_TZ) => {
     const key = this.getDateKeyToday(timeZone); // YYYY-MM-DD
     const [y, m, d] = key.split("-").map(Number);
@@ -37,6 +37,37 @@ export class AttendanceService {
     const start = new Date(Date.UTC(y, m, 1));
     const end = new Date(Date.UTC(y, m + 1, 0));
     return { start, end };
+  };
+
+  private resolveDateRange = (
+    query: Pick<GetAttendanceHistoryDto, "startDate" | "endDate">,
+  ) => {
+    const hasStart = !!query.startDate;
+    const hasEnd = !!query.endDate;
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (!hasStart && !hasEnd) {
+      const currentMonth = this.getCurrentMonthRange();
+      startDate = currentMonth.start;
+      endDate = currentMonth.end;
+    } else if (hasStart && hasEnd) {
+      startDate = this.parseDateOnly(query.startDate as string);
+      endDate = this.parseDateOnly(query.endDate as string);
+    } else if (hasStart) {
+      startDate = this.parseDateOnly(query.startDate as string);
+      endDate = this.getMonthRangeByDate(startDate).end;
+    } else {
+      endDate = this.parseDateOnly(query.endDate as string);
+      startDate = this.getMonthRangeByDate(endDate).start;
+    }
+
+    if (startDate > endDate) {
+      throw new ApiError("startDate cannot be greater than endDate", 400);
+    }
+
+    return { startDate, endDate };
   };
 
   private resolveOutletStaff = async (userId: number) => {
@@ -141,31 +172,7 @@ export class AttendanceService {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(31, Math.max(1, query.limit ?? 7));
     const skip = (page - 1) * limit;
-
-    const hasStart = !!query.startDate;
-    const hasEnd = !!query.endDate;
-
-    let startDate: Date;
-    let endDate: Date;
-
-    if (!hasStart && !hasEnd) {
-      const currentMonth = this.getCurrentMonthRange();
-      startDate = currentMonth.start;
-      endDate = currentMonth.end;
-    } else if (hasStart && hasEnd) {
-      startDate = this.parseDateOnly(query.startDate as string);
-      endDate = this.parseDateOnly(query.endDate as string);
-    } else if (hasStart) {
-      startDate = this.parseDateOnly(query.startDate as string);
-      endDate = this.getMonthRangeByDate(startDate).end;
-    } else {
-      endDate = this.parseDateOnly(query.endDate as string);
-      startDate = this.getMonthRangeByDate(endDate).start;
-    }
-
-    if (startDate > endDate) {
-      throw new ApiError("startDate cannot be greater than endDate", 400);
-    }
+    const { startDate, endDate } = this.resolveDateRange(query);
 
     const [total, items] = await Promise.all([
       this.prisma.attendanceLog.count({
