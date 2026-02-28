@@ -8,6 +8,7 @@ import { WorkerService } from "./worker.service.js";
 import { RoleCode } from "../../../generated/prisma/enums.js";
 import { StationParamDto } from "./dto/station-param.dto.js";
 import { GetWorkerOrdersDto } from "./dto/get-worker-orders.dto.js";
+import { GetWorkerOrdersParamDto } from "./dto/get-worker-orders-param.dto.js";
 import { ClaimOrderParamDto } from "./dto/claim-order-param.dto.js";
 import { CompleteStationParamDto } from "./dto/complete-station-param.dto.js";
 import { CompleteStationDto } from "./dto/complete-station.dto.js";
@@ -41,8 +42,8 @@ export class WorkerRouter {
     );
 
     this.router.get(
-      "/stations/:stationType/orders",
-      this.validationMiddleware.validateParams(StationParamDto),
+      "/stations/:stationType/orders/:outletId",
+      this.validationMiddleware.validateParams(GetWorkerOrdersParamDto),
       this.validationMiddleware.validateQuery(GetWorkerOrdersDto),
       workerController.getStationOrders,
     );
@@ -52,6 +53,8 @@ export class WorkerRouter {
       this.validationMiddleware.validateParams(WorkerOrderDetailParamDto),
       workerController.getOrderDetail,
     );
+
+    this.router.get("/task-history", workerController.getTaskHistory);
 
     // 1) CLAIM (startTask)
     this.router.post(

@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import { ReportService } from "./report.service.js";
 import { RoleCode } from "../../../generated/prisma/client.js";
 import { ApiError } from "../../utils/api-error.js";
+import { GetAttendanceReportDto } from "./dto/get-attendance-report.dto.js";
+import { OutletStaffParamDto } from "./dto/outlet-staff-param.dto.js";
 
 export class ReportController {
   constructor(private reportService: ReportService) {}
@@ -77,6 +79,67 @@ export class ReportController {
         message: "Laporan performa berhasil diambil",
         data: result.data,
         meta: result.meta,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getAttendance = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const outletId = this.getAuthorizedOutletId(
+        res.locals.user,
+        req.query.outletId as string,
+      );
+
+      if (!outletId) {
+        throw new ApiError("Outlet ID is required", 400);
+      }
+
+      const result = await this.reportService.getAttendanceReport(
+        outletId,
+        req.query as unknown as GetAttendanceReportDto,
+      );
+
+      res.status(200).json({
+        message: "Laporan attendance berhasil diambil",
+        data: result.data,
+        meta: result.meta,
+        filter: result.filter,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getAttendanceHistoryDetail = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const outletId = this.getAuthorizedOutletId(
+        res.locals.user,
+        req.query.outletId as string,
+      );
+
+      if (!outletId) {
+        throw new ApiError("Outlet ID is required", 400);
+      }
+
+      const { outletStaffId } = req.params as unknown as OutletStaffParamDto;
+
+      const result = await this.reportService.getAttendanceHistoryDetail(
+        outletId,
+        Number(outletStaffId),
+        req.query as unknown as GetAttendanceReportDto,
+      );
+
+      res.status(200).json({
+        message: "Detail attendance berhasil diambil",
+        data: result.data,
+        meta: result.meta,
+        filter: result.filter,
       });
     } catch (error) {
       next(error);

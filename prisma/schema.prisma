@@ -62,6 +62,7 @@ enum PickupStatus {
   DRIVER_ASSIGNED
   PICKED_UP
   ARRIVED_OUTLET
+  COMPLETED
   CANCELED
 }
 
@@ -323,6 +324,7 @@ model OutletStaff {
 
   attendanceLogs   AttendanceLog[]
   shiftAssignments ShiftAssignment[]
+  taskHistories    WorkerTaskHistory[]
 
   @@unique([outletId, userId])
   @@index([userId])
@@ -457,10 +459,27 @@ model Order {
   payments    Payment[]
   driverTasks DriverTask[]
   complaints  Complaint[]
+  workerTaskHistories WorkerTaskHistory[]
 
   @@index([outletId])
   @@index([customerId])
   @@index([status])
+}
+
+model WorkerTaskHistory {
+  id            Int      @id @default(autoincrement())
+  orderId       String   @db.Uuid
+  outletStaffId Int
+  createdAt     DateTime @default(now())
+  timeDone      DateTime?
+  updatedAt     DateTime @updatedAt
+
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  outletStaff OutletStaff @relation(fields: [outletStaffId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([outletStaffId])
+  @@map("WorkerTaskHistory")
 }
 
 model OrderItem {
