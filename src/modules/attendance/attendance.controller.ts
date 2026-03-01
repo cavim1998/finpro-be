@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { ApiError } from "../../utils/api-error.js";
 import { AttendanceService } from "./attendance.service.js";
 import { GetAttendanceHistoryDto } from "./dto/get-attendance-history.dto.js";
+import { OutletStaffParamDto } from "./dto/outlet-staff-param.dto.js";
 
 export class AttendanceController {
   constructor(private attendanceService: AttendanceService) {}
@@ -71,6 +72,23 @@ export class AttendanceController {
   getAllHistory = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = await this.attendanceService.getAllHistory(
+        req.query as unknown as GetAttendanceHistoryDto,
+      );
+      res.status(200).send({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getAllHistoryDetail = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const { outletStaffId } = req.params as unknown as OutletStaffParamDto;
+      const data = await this.attendanceService.getAllHistoryDetail(
+        Number(outletStaffId),
         req.query as unknown as GetAttendanceHistoryDto,
       );
       res.status(200).send({ status: "success", data });
