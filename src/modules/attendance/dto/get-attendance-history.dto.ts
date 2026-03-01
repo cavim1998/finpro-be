@@ -3,6 +3,12 @@ import { IsDateString, IsInt, IsOptional, Max, Min } from "class-validator";
 
 export class GetAttendanceHistoryDto {
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  outletId?: number;
+
+  @IsOptional()
   @IsDateString()
   startDate?: string;
 
