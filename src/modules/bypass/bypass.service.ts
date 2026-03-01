@@ -129,6 +129,7 @@ export class BypassService {
     adminNote?: string,
   ) => {
     return await this.prisma.$transaction(async (tx) => {
+      const decisionTime = new Date();
       const request = await tx.bypassRequest.findUnique({
         where: { id },
         include: { diffs: true, orderStation: true },
@@ -144,7 +145,7 @@ export class BypassService {
           data: {
             status: BypassStatus.REJECTED,
             approvedByAdminId: adminId,
-            decidedAt: new Date(),
+            decidedAt: decisionTime,
             adminNote: adminNote,
           },
         });
@@ -161,7 +162,7 @@ export class BypassService {
           data: {
             status: BypassStatus.APPROVED,
             approvedByAdminId: adminId,
-            decidedAt: new Date(),
+            decidedAt: decisionTime,
             adminNote: adminNote,
           },
         });
@@ -193,12 +194,19 @@ export class BypassService {
           where: { id: request.orderStationId },
           data: {
             status: StationStatus.COMPLETED,
-            completedAt: new Date(),
+            completedAt: decisionTime,
           },
         });
 
         const detailOrderStation = await tx.orderStation.findUnique({
           where: { id: request.orderStationId },
+          include: {
+            order: {
+              select: {
+                outletId: true,
+              },
+            },
+          },
         });
 
         if (!detailOrderStation) throw new Error("Order Station Not Found");
@@ -211,6 +219,25 @@ export class BypassService {
           where: { id: detailOrderStation.orderId },
           data: { status: finalOrderStatus },
         });
+
+        const openHistory = await tx.workerTaskHistory.findFirst({
+          where: {
+            orderId: detailOrderStation.orderId,
+            timeDone: null,
+            outletStaff: {
+              userId: request.requestedByWorkerId,
+              outletId: detailOrderStation.order.outletId,
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+
+        if (openHistory) {
+          await tx.workerTaskHistory.update({
+            where: { id: openHistory.id },
+            data: { timeDone: decisionTime },
+          });
+        }
 
         return {
           message: "Bypass Approved. Inventory updated and station completed.",

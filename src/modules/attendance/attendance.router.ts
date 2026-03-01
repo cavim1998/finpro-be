@@ -7,6 +7,7 @@ import { AttendanceController } from "./attendance.controller.js";
 import { ClockInDto } from "./dto/clock-in.dto.js";
 import { ClockOutDto } from "./dto/clock-out.dto.js";
 import { GetAttendanceHistoryDto } from "./dto/get-attendance-history.dto.js";
+import { OutletStaffParamDto } from "./dto/outlet-staff-param.dto.js";
 
 export class AttendanceRouter {
   private router: Router;
@@ -30,6 +31,23 @@ export class AttendanceRouter {
       requireRole(["WORKER", "DRIVER"]),
       this.validationMiddleware.validateQuery(GetAttendanceHistoryDto),
       this.attendanceController.getHistory,
+    );
+
+    this.router.get(
+      "/admin/history",
+      verifyToken(JWT_SECRET),
+      requireRole(["SUPER_ADMIN"]),
+      this.validationMiddleware.validateQuery(GetAttendanceHistoryDto),
+      this.attendanceController.getAllHistory,
+    );
+
+    this.router.get(
+      "/admin/history/:outletStaffId",
+      verifyToken(JWT_SECRET),
+      requireRole(["SUPER_ADMIN"]),
+      this.validationMiddleware.validateParams(OutletStaffParamDto),
+      this.validationMiddleware.validateQuery(GetAttendanceHistoryDto),
+      this.attendanceController.getAllHistoryDetail,
     );
 
     this.router.post(

@@ -1,13 +1,7 @@
 import { Type } from "class-transformer";
 import { IsDateString, IsInt, IsOptional, Max, Min } from "class-validator";
 
-export class GetAttendanceHistoryDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  outletId?: number;
-
+export class GetAttendanceReportDto {
   @IsOptional()
   @IsDateString()
   startDate?: string;
@@ -26,6 +20,6 @@ export class GetAttendanceHistoryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(31)
-  limit: number = 7;
+  @Max(100)
+  limit: number = 10;
 }

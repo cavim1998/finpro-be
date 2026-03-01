@@ -8,17 +8,6 @@ import {
 import { prisma } from "../../lib/prisma.js";
 import { ApiError } from "../../utils/api-error.js";
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-function endOfToday() {
-  const d = new Date();
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-
 // urutan status order setelah station selesai
 function nextOrderStatusByStation(stationType: StationType): OrderStatus {
   switch (stationType) {
@@ -77,6 +66,19 @@ type OrderStationLookupInclude = {
 };
 
 export class WorkerService {
+  private async getActiveOutletStaff(db: any, userId: number) {
+    const staff = await db.outletStaff.findFirst({
+      where: { userId, isActive: true },
+      select: { id: true, outletId: true },
+    });
+
+    if (!staff) {
+      throw new ApiError("Worker is not assigned to any outlet", 403);
+    }
+
+    return staff;
+  }
+
   private async findStationByParam(
     db: any,
     stationType: StationType,
@@ -103,6 +105,7 @@ export class WorkerService {
 
   async getStationStats(userId: number, stationType: StationType) {
     const readyStatus = readyOrderStatusForStation(stationType);
+    const staff = await this.getActiveOutletStaff(prisma, userId);
 
     const [incoming, inProgress, completed] = await Promise.all([
       prisma.orderStation.count({
@@ -122,12 +125,12 @@ export class WorkerService {
           },
         },
       }),
-      prisma.orderStation.count({
+      prisma.workerTaskHistory.count({
         where: {
-          stationType,
-          assignedWorkerId: userId,
-          status: StationStatus.COMPLETED,
-          completedAt: { gte: startOfToday(), lte: endOfToday() },
+          outletStaffId: staff.id,
+          timeDone: {
+            not: null,
+          },
         },
       }),
     ]);
@@ -138,10 +141,16 @@ export class WorkerService {
   async getOrders(
     userId: number,
     stationType: StationType,
+    outletId: number,
     scope: "incoming" | "my" | "completed" = "my",
     page = 1,
     limit = 10,
   ) {
+    const staff = await this.getActiveOutletStaff(prisma, userId);
+    if (staff.outletId !== outletId) {
+      throw new ApiError("You are not assigned to this outlet", 403);
+    }
+
     const skip = (page - 1) * limit;
     const readyStatus = readyOrderStatusForStation(stationType);
 
@@ -151,13 +160,14 @@ export class WorkerService {
             stationType,
             status: StationStatus.PENDING,
             assignedWorkerId: null,
-            order: { status: readyStatus },
+            order: { status: readyStatus, outletId },
           }
         : scope === "completed"
           ? {
               stationType,
               assignedWorkerId: userId,
               status: StationStatus.COMPLETED,
+              order: { outletId },
             }
           : {
               stationType,
@@ -165,6 +175,7 @@ export class WorkerService {
               status: {
                 in: [StationStatus.IN_PROGRESS, StationStatus.WAITING_BYPASS],
               },
+              order: { outletId },
             };
 
     const stations = await prisma.orderStation.findMany({
@@ -198,6 +209,7 @@ export class WorkerService {
         orderStationId: s.id,
         orderId: s.orderId,
         orderNo: s.order.orderNo,
+        outletId: s.order.outletId,
         customerName,
         clothesCount,
         totalKg: Number(s.order.totalWeightKg),
@@ -208,14 +220,7 @@ export class WorkerService {
   }
 
   async getOrderDetail(userId: number, orderParam: string) {
-    const staff = await prisma.outletStaff.findFirst({
-      where: { userId, isActive: true },
-      select: { outletId: true },
-    });
-
-    if (!staff) {
-      throw new ApiError("Worker is not assigned to any outlet", 403);
-    }
+    const staff = await this.getActiveOutletStaff(prisma, userId);
 
     const includeOrder = {
       customer: { include: { profile: true } },
@@ -318,7 +323,46 @@ export class WorkerService {
     };
   }
 
+  async getTaskHistory(userId: number, page = 1, limit = 10) {
+    const staff = await this.getActiveOutletStaff(prisma, userId);
+    const skip = (page - 1) * limit;
+
+    const histories = await prisma.workerTaskHistory.findMany({
+      where: { outletStaffId: staff.id },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+      include: {
+        order: {
+          include: {
+            customer: { include: { profile: true } },
+            outlet: true,
+          },
+        },
+      },
+    });
+
+    return histories.map((history) => ({
+      id: history.id,
+      orderId: history.orderId,
+      orderNo: history.order.orderNo,
+      orderStatus: history.order.status,
+      customerName:
+        history.order.customer?.profile?.fullName ||
+        history.order.customer?.email ||
+        "Customer",
+      outlet: {
+        id: history.order.outlet.id,
+        name: history.order.outlet.name,
+      },
+      startedAt: history.createdAt,
+      timeDone: history.timeDone,
+      updatedAt: history.updatedAt,
+    }));
+  }
+
   async claimOrder(userId: number, stationType: StationType, orderId: string) {
+    const staff = await this.getActiveOutletStaff(prisma, userId);
     const station = await this.findStationByParam(prisma, stationType, orderId);
     if (!station) throw new ApiError("Order station not found", 404);
     const readyStatus = readyOrderStatusForStation(stationType);
@@ -369,6 +413,13 @@ export class WorkerService {
         data: { status: inProgressOrderStatus(stationType) },
       });
 
+      await tx.workerTaskHistory.create({
+        data: {
+          orderId: station.orderId,
+          outletStaffId: staff.id,
+        },
+      });
+
       return updated;
     });
   }
@@ -382,6 +433,7 @@ export class WorkerService {
     const itemCounts = payload?.itemCounts ?? [];
 
     return prisma.$transaction(async (tx) => {
+      const staff = await this.getActiveOutletStaff(tx, userId);
       const station = await this.findStationByParam(tx, stationType, orderId, {
         order: { include: { items: true } }, // OrderItem: itemId, qty
       });
@@ -435,7 +487,6 @@ export class WorkerService {
         });
       }
 
-      // mismatch check (harus persis sama)
       const mismatches: Array<{
         itemId: number;
         expectedQty: number;
@@ -450,23 +501,21 @@ export class WorkerService {
       }
 
       if (mismatches.length > 0) {
-        // FE: munculkan tombol bypass
         throw new ApiError("Item counts mismatch. Use bypass if needed.", 400);
       }
+
+      const completedAt = new Date();
 
       const updated = await tx.orderStation.update({
         where: { id: station.id },
         data: {
           status: StationStatus.COMPLETED,
-          completedAt: new Date(),
+          completedAt,
         },
       });
 
-      // Determine final order status
       let finalOrderStatus = nextOrderStatusByStation(stationType);
 
-      // Jika packing selesai, cek apakah customer sudah bayar
-      // Jika sudah bayar, kirim langsung ke READY_TO_DELIVER, bukan WAITING_PAYMENT
       if (
         stationType === StationType.PACKING &&
         finalOrderStatus === OrderStatus.WAITING_PAYMENT
@@ -487,6 +536,31 @@ export class WorkerService {
         where: { id: station.orderId },
         data: { status: finalOrderStatus },
       });
+
+      const openHistory = await tx.workerTaskHistory.findFirst({
+        where: {
+          orderId: station.orderId,
+          outletStaffId: staff.id,
+          timeDone: null,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (openHistory) {
+        await tx.workerTaskHistory.update({
+          where: { id: openHistory.id },
+          data: { timeDone: completedAt },
+        });
+      } else {
+        await tx.workerTaskHistory.create({
+          data: {
+            orderId: station.orderId,
+            outletStaffId: staff.id,
+            createdAt: station.startedAt ?? completedAt,
+            timeDone: completedAt,
+          },
+        });
+      }
 
       return updated;
     });

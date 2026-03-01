@@ -189,7 +189,10 @@ export class App {
     const paymentRouter = new PaymentRouter(prismaClient, validationMiddleware);
     const workerRouter = new WorkerRouter(validationMiddleware);
     const bypassRouter = new BypassRouter(bypassController);
-    const reportRouter = new ReportRouter(reportController);
+    const reportRouter = new ReportRouter(
+      reportController,
+      validationMiddleware,
+    );
     const dashboardRouter = new DashboardRouter(dashboardController);
 
     this.app.use("/samples", sampleRouter.getRouter());

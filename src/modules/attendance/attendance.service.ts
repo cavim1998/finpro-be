@@ -1,4 +1,4 @@
-import { PrismaClient } from "../../../generated/prisma/client.js";
+import { PrismaClient, RoleCode } from "../../../generated/prisma/client.js";
 import { ApiError } from "../../utils/api-error.js";
 import { GetAttendanceHistoryDto } from "./dto/get-attendance-history.dto.js";
 
@@ -11,7 +11,7 @@ export class AttendanceService {
     // en-CA => YYYY-MM-DD
     return new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
   };
-  //hello world
+
   private getTodayDate = (timeZone = DEFAULT_TZ) => {
     const key = this.getDateKeyToday(timeZone); // YYYY-MM-DD
     const [y, m, d] = key.split("-").map(Number);
@@ -37,6 +37,37 @@ export class AttendanceService {
     const start = new Date(Date.UTC(y, m, 1));
     const end = new Date(Date.UTC(y, m + 1, 0));
     return { start, end };
+  };
+
+  private resolveDateRange = (
+    query: Pick<GetAttendanceHistoryDto, "startDate" | "endDate">,
+  ) => {
+    const hasStart = !!query.startDate;
+    const hasEnd = !!query.endDate;
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (!hasStart && !hasEnd) {
+      const currentMonth = this.getCurrentMonthRange();
+      startDate = currentMonth.start;
+      endDate = currentMonth.end;
+    } else if (hasStart && hasEnd) {
+      startDate = this.parseDateOnly(query.startDate as string);
+      endDate = this.parseDateOnly(query.endDate as string);
+    } else if (hasStart) {
+      startDate = this.parseDateOnly(query.startDate as string);
+      endDate = this.getMonthRangeByDate(startDate).end;
+    } else {
+      endDate = this.parseDateOnly(query.endDate as string);
+      startDate = this.getMonthRangeByDate(endDate).start;
+    }
+
+    if (startDate > endDate) {
+      throw new ApiError("startDate cannot be greater than endDate", 400);
+    }
+
+    return { startDate, endDate };
   };
 
   private resolveOutletStaff = async (userId: number) => {
@@ -141,31 +172,7 @@ export class AttendanceService {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(31, Math.max(1, query.limit ?? 7));
     const skip = (page - 1) * limit;
-
-    const hasStart = !!query.startDate;
-    const hasEnd = !!query.endDate;
-
-    let startDate: Date;
-    let endDate: Date;
-
-    if (!hasStart && !hasEnd) {
-      const currentMonth = this.getCurrentMonthRange();
-      startDate = currentMonth.start;
-      endDate = currentMonth.end;
-    } else if (hasStart && hasEnd) {
-      startDate = this.parseDateOnly(query.startDate as string);
-      endDate = this.parseDateOnly(query.endDate as string);
-    } else if (hasStart) {
-      startDate = this.parseDateOnly(query.startDate as string);
-      endDate = this.getMonthRangeByDate(startDate).end;
-    } else {
-      endDate = this.parseDateOnly(query.endDate as string);
-      startDate = this.getMonthRangeByDate(endDate).start;
-    }
-
-    if (startDate > endDate) {
-      throw new ApiError("startDate cannot be greater than endDate", 400);
-    }
+    const { startDate, endDate } = this.resolveDateRange(query);
 
     const [total, items] = await Promise.all([
       this.prisma.attendanceLog.count({
@@ -205,6 +212,225 @@ export class AttendanceService {
         endDate,
       },
       items,
+    };
+  };
+
+  getAllHistory = async (query: GetAttendanceHistoryDto) => {
+    const workerRoles: RoleCode[] = [RoleCode.WORKER, RoleCode.DRIVER];
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(31, Math.max(1, query.limit ?? 7));
+    const skip = (page - 1) * limit;
+    const outletId =
+      typeof query.outletId === "number" && query.outletId > 0
+        ? query.outletId
+        : undefined;
+    const { startDate, endDate } = this.resolveDateRange(query);
+
+    const staffWhere = {
+      isActive: true,
+      ...(outletId ? { outletId } : {}),
+      user: {
+        is: {
+          role: {
+            in: workerRoles,
+          },
+        },
+      },
+    };
+
+    const [total, staffList, attendanceCounts] = await Promise.all([
+      this.prisma.outletStaff.count({
+        where: staffWhere,
+      }),
+      this.prisma.outletStaff.findMany({
+        where: staffWhere,
+        select: {
+          id: true,
+          workerStation: true,
+          outlet: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              email: true,
+              role: true,
+              profile: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.attendanceLog.groupBy({
+        by: ["outletStaffId"],
+        where: {
+          date: {
+            gte: startDate,
+            lte: endDate,
+          },
+          staff: staffWhere,
+        },
+        _count: {
+          clockInAt: true,
+          clockOutAt: true,
+        },
+      }),
+    ]);
+
+    const countMap = new Map(
+      attendanceCounts.map((item) => [
+        item.outletStaffId,
+        {
+          totalClockIn: item._count.clockInAt,
+          totalClockOut: item._count.clockOutAt,
+        },
+      ]),
+    );
+
+    const items = staffList.map((staff) => ({
+      outletStaffId: staff.id,
+      userId: staff.user.id,
+      employeeName:
+        staff.user.profile?.fullName || staff.user.email || "Tanpa Nama",
+      role: staff.user.role,
+      position:
+        staff.user.role === RoleCode.DRIVER
+          ? "DRIVER"
+          : staff.workerStation || "-",
+      outlet: {
+        id: staff.outlet.id,
+        name: staff.outlet.name,
+      },
+      totalClockIn: countMap.get(staff.id)?.totalClockIn ?? 0,
+      totalClockOut: countMap.get(staff.id)?.totalClockOut ?? 0,
+    }));
+
+    return {
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      filter: {
+        outletId,
+        startDate,
+        endDate,
+      },
+      items,
+    };
+  };
+
+  getAllHistoryDetail = async (
+    outletStaffId: number,
+    query: GetAttendanceHistoryDto,
+  ) => {
+    const workerRoles: RoleCode[] = [RoleCode.WORKER, RoleCode.DRIVER];
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(31, Math.max(1, query.limit ?? 7));
+    const skip = (page - 1) * limit;
+    const { startDate, endDate } = this.resolveDateRange(query);
+
+    const staff = await this.prisma.outletStaff.findFirst({
+      where: {
+        id: outletStaffId,
+        isActive: true,
+        user: {
+          is: {
+            role: {
+              in: workerRoles,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        workerStation: true,
+        outlet: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            profile: {
+              select: {
+                fullName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!staff) {
+      throw new ApiError("Attendance staff not found", 404);
+    }
+
+    const [total, items] = await Promise.all([
+      this.prisma.attendanceLog.count({
+        where: {
+          outletStaffId: staff.id,
+          date: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+      }),
+      this.prisma.attendanceLog.findMany({
+        where: {
+          outletStaffId: staff.id,
+          date: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: {
+        outletStaffId: staff.id,
+        userId: staff.user.id,
+        employeeName:
+          staff.user.profile?.fullName || staff.user.email || "Tanpa Nama",
+        role: staff.user.role,
+        position:
+          staff.user.role === RoleCode.DRIVER
+            ? "DRIVER"
+            : staff.workerStation || "-",
+        outlet: {
+          id: staff.outlet.id,
+          name: staff.outlet.name,
+        },
+        items,
+      },
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      filter: {
+        startDate,
+        endDate,
+      },
     };
   };
 }
