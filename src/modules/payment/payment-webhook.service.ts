@@ -97,7 +97,7 @@ export class PaymentWebhookService {
     paymentStatus: PaymentStatus,
     orderNeedsUpdate: boolean,
   ) {
-    await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: paymentId },
         data: {
@@ -107,13 +107,39 @@ export class PaymentWebhookService {
       });
 
       if (!orderNeedsUpdate || paymentStatus !== PaymentStatus.PAID) {
-        return;
+        const currentOrder = await tx.order.findUnique({
+          where: { id: orderId },
+          select: { status: true },
+        });
+
+        return currentOrder?.status ?? null;
       }
+
+      const currentOrder = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { status: true },
+      });
+
+      if (!currentOrder) {
+        return null;
+      }
+
+      const shouldMoveToReady =
+        currentOrder.status === OrderStatus.WAITING_PAYMENT;
 
       await tx.order.update({
         where: { id: orderId },
-        data: { paidAt: new Date() },
+        data: {
+          paidAt: new Date(),
+          ...(shouldMoveToReady && {
+            status: OrderStatus.READY_TO_DELIVER,
+          }),
+        },
       });
+
+      return shouldMoveToReady
+        ? OrderStatus.READY_TO_DELIVER
+        : currentOrder.status;
     });
   }
 
@@ -124,16 +150,14 @@ export class PaymentWebhookService {
     const payment = await this.resolvePaymentOrThrow(payload);
     const mappedStatus = this.mapPaymentStatus(payload.transaction_status);
 
-    await this.updatePaymentTransaction(
+    const updatedOrderStatus = await this.updatePaymentTransaction(
       payment.id,
       payment.order.id,
       mappedStatus.paymentStatus,
       mappedStatus.orderNeedsUpdate,
     );
 
-    const orderStatus = mappedStatus.orderNeedsUpdate
-      ? OrderStatus.READY_TO_DELIVER
-      : payment.order.status;
+    const orderStatus = updatedOrderStatus ?? payment.order.status;
 
     return {
       success: true,
