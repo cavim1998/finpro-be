@@ -1,4 +1,4 @@
-import { PrismaClient } from "../../../generated/prisma/client.js";
+import { PrismaClient, RoleCode } from "../../../generated/prisma/client.js";
 import { ApiError } from "../../utils/api-error.js";
 import { GetAttendanceHistoryDto } from "./dto/get-attendance-history.dto.js";
 
@@ -201,6 +201,105 @@ export class AttendanceService {
     return {
       outletStaffId: staff.id,
       outletId: staff.outletId,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      filter: {
+        startDate,
+        endDate,
+      },
+      items,
+    };
+  };
+
+  getAllHistory = async (query: GetAttendanceHistoryDto) => {
+    const workerRoles: RoleCode[] = [RoleCode.WORKER, RoleCode.DRIVER];
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(31, Math.max(1, query.limit ?? 7));
+    const skip = (page - 1) * limit;
+    const { startDate, endDate } = this.resolveDateRange(query);
+
+    const where = {
+      date: {
+        gte: startDate,
+        lte: endDate,
+      },
+      staff: {
+        isActive: true,
+        user: {
+          is: {
+            role: {
+              in: workerRoles,
+            },
+          },
+        },
+      },
+    };
+
+    const [total, logs] = await Promise.all([
+      this.prisma.attendanceLog.count({ where }),
+      this.prisma.attendanceLog.findMany({
+        where,
+        include: {
+          staff: {
+            select: {
+              id: true,
+              workerStation: true,
+              outlet: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  role: true,
+                  profile: {
+                    select: {
+                      fullName: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    const items = logs.map((log) => ({
+      id: log.id,
+      date: log.date,
+      clockInAt: log.clockInAt,
+      clockOutAt: log.clockOutAt,
+      notes: log.notes,
+      createdAt: log.createdAt,
+      outletStaffId: log.staff.id,
+      userId: log.staff.user.id,
+      employeeName:
+        log.staff.user.profile?.fullName ||
+        log.staff.user.email ||
+        "Tanpa Nama",
+      role: log.staff.user.role,
+      position:
+        log.staff.user.role === RoleCode.DRIVER
+          ? "DRIVER"
+          : log.staff.workerStation || "-",
+      outlet: {
+        id: log.staff.outlet.id,
+        name: log.staff.outlet.name,
+      },
+    }));
+
+    return {
       pagination: {
         page,
         limit,

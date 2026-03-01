@@ -8,17 +8,6 @@ import {
 import { prisma } from "../../lib/prisma.js";
 import { ApiError } from "../../utils/api-error.js";
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-function endOfToday() {
-  const d = new Date();
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-
 // urutan status order setelah station selesai
 function nextOrderStatusByStation(stationType: StationType): OrderStatus {
   switch (stationType) {
@@ -116,6 +105,7 @@ export class WorkerService {
 
   async getStationStats(userId: number, stationType: StationType) {
     const readyStatus = readyOrderStatusForStation(stationType);
+    const staff = await this.getActiveOutletStaff(prisma, userId);
 
     const [incoming, inProgress, completed] = await Promise.all([
       prisma.orderStation.count({
@@ -135,12 +125,12 @@ export class WorkerService {
           },
         },
       }),
-      prisma.orderStation.count({
+      prisma.workerTaskHistory.count({
         where: {
-          stationType,
-          assignedWorkerId: userId,
-          status: StationStatus.COMPLETED,
-          completedAt: { gte: startOfToday(), lte: endOfToday() },
+          outletStaffId: staff.id,
+          timeDone: {
+            not: null,
+          },
         },
       }),
     ]);

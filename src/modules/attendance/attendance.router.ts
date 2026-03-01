@@ -32,6 +32,14 @@ export class AttendanceRouter {
       this.attendanceController.getHistory,
     );
 
+    this.router.get(
+      "/admin/history",
+      verifyToken(JWT_SECRET),
+      requireRole(["SUPER_ADMIN"]),
+      this.validationMiddleware.validateQuery(GetAttendanceHistoryDto),
+      this.attendanceController.getAllHistory,
+    );
+
     this.router.post(
       "/me/clock-in",
       verifyToken(JWT_SECRET),
