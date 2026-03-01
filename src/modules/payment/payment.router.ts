@@ -3,7 +3,6 @@ import { PaymentController } from "./payment.controller.js";
 import { PaymentService } from "./payment.service.js";
 import { verifyToken } from "../../middlewares/jwt.middleware.js";
 import { ValidationMiddleware } from "../../middlewares/validation.middleware.js";
-import { UploaderMiddleware } from "../../middlewares/uploader.middleware.js";
 import { CreatePaymentDTO } from "./dto/create-payment.dto.js";
 import { PrismaClient } from "../../../generated/prisma/client.js";
 import { JWT_SECRET } from "../../config/env.js";
@@ -12,7 +11,6 @@ export class PaymentRouter {
   private router: Router;
   private paymentController: PaymentController;
   private validationMiddleware: ValidationMiddleware;
-  private uploaderMiddleware: UploaderMiddleware;
 
   constructor(
     prisma: PrismaClient,
@@ -20,7 +18,6 @@ export class PaymentRouter {
   ) {
     this.router = Router();
     this.validationMiddleware = validationMiddleware;
-    this.uploaderMiddleware = new UploaderMiddleware();
 
     const paymentService = new PaymentService(prisma);
     this.paymentController = new PaymentController(paymentService);
@@ -52,14 +49,6 @@ export class PaymentRouter {
       "/mock-success/:orderId",
       verifyToken(JWT_SECRET),
       this.paymentController.mockPaymentSuccess,
-    );
-
-    // Upload payment proof (QRIS receipt image) //TIDAK PERLU
-    this.router.post(
-      "/:paymentId/upload-proof",
-      verifyToken(JWT_SECRET),
-      this.uploaderMiddleware.upload().single("proof"),
-      this.paymentController.uploadPaymentProof,
     );
   }
 

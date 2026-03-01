@@ -75,8 +75,6 @@ export class PickupRequestService {
       },
     });
 
-    // TODO: Send notification to drivers at this outlet
-
     return {
       ...pickupRequest,
       distance: nearestOutlet.distance,

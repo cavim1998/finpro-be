@@ -1,29 +1,36 @@
 import { Request, Response, NextFunction } from "express";
 import { PaymentService } from "./payment.service.js";
-import { CloudinaryService } from "../cloudinary/cloudinary.service.js";
 import { ApiError } from "../../utils/api-error.js";
 
 export class PaymentController {
-  constructor(
-    private paymentService: PaymentService,
-    private cloudinaryService: CloudinaryService = new CloudinaryService(),
-  ) {}
+  constructor(private paymentService: PaymentService) {}
+
+  private getUserIdOrThrow(res: Response) {
+    const authUser = res.locals.user as { sub?: string };
+    if (!authUser?.sub) {
+      throw new ApiError("Unauthorized", 401);
+    }
+
+    return parseInt(authUser.sub, 10);
+  }
+
+  private sendSuccess(
+    res: Response,
+    statusCode: number,
+    message: string,
+    data: unknown,
+  ) {
+    res.status(statusCode).json({ message, data });
+  }
 
   createPayment = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const authUser = res.locals.user as { sub?: string };
-      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
-      const customerId = parseInt(authUser.sub);
-
+      const customerId = this.getUserIdOrThrow(res);
       const result = await this.paymentService.createPayment(
         req.body,
         customerId,
       );
-
-      res.status(201).json({
-        message: "Payment berhasil dibuat",
-        data: result,
-      });
+      this.sendSuccess(res, 201, "Payment berhasil dibuat", result);
     } catch (error) {
       next(error);
     }
@@ -51,21 +58,13 @@ export class PaymentController {
     next: NextFunction,
   ) => {
     try {
-      const authUser = res.locals.user as { sub?: string };
-      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
-      const customerId = parseInt(authUser.sub);
-
+      const customerId = this.getUserIdOrThrow(res);
       const { orderId } = req.params as { orderId: string };
-
       const result = await this.paymentService.getPaymentsByOrder(
         orderId,
         customerId,
       );
-
-      res.status(200).json({
-        message: "Payments berhasil diambil",
-        data: result,
-      });
+      this.sendSuccess(res, 200, "Payments berhasil diambil", result);
     } catch (error) {
       next(error);
     }
@@ -82,45 +81,6 @@ export class PaymentController {
       const result = await this.paymentService.mockPaymentSuccess(orderId);
 
       res.status(200).json(result);
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  // Upload payment proof image (QRIS receipt)
-  uploadPaymentProof = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ) => {
-    try {
-      const authUser = res.locals.user as { sub?: string };
-      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
-      const customerId = parseInt(authUser.sub);
-
-      const { paymentId } = req.params as { paymentId: string };
-      const file = req.file;
-
-      if (!file) {
-        throw new ApiError("File bukti pembayaran tidak diterima", 400);
-      }
-
-      // Upload to Cloudinary
-      const uploadResult = await this.cloudinaryService.upload(file);
-      const proofUrl = uploadResult.secure_url;
-
-      const paymentIdNum = parseInt(paymentId);
-
-      const result = await this.paymentService.uploadPaymentProof(
-        paymentIdNum,
-        proofUrl,
-        customerId,
-      );
-
-      res.status(200).json({
-        message: "Bukti pembayaran berhasil diupload",
-        data: result,
-      });
     } catch (error) {
       next(error);
     }
