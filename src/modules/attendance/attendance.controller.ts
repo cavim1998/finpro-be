@@ -67,4 +67,15 @@ export class AttendanceController {
       next(err);
     }
   };
+
+  getAllHistory = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.attendanceService.getAllHistory(
+        req.query as unknown as GetAttendanceHistoryDto,
+      );
+      res.status(200).send({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  };
 }
