@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { PaymentService } from "./payment.service.js";
 import { ApiError } from "../../utils/api-error.js";
 
@@ -23,20 +23,16 @@ export class PaymentController {
     res.status(statusCode).json({ message, data });
   }
 
-  createPayment = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const customerId = this.getUserIdOrThrow(res);
-      const result = await this.paymentService.createPayment(
-        req.body,
-        customerId,
-      );
-      this.sendSuccess(res, 201, "Payment berhasil dibuat", result);
-    } catch (error) {
-      next(error);
-    }
+  createPayment = async (req: Request, res: Response) => {
+    const customerId = this.getUserIdOrThrow(res);
+    const result = await this.paymentService.createPayment(
+      req.body,
+      customerId,
+    );
+    this.sendSuccess(res, 201, "Payment berhasil dibuat", result);
   };
 
-  handleWebhook = async (req: Request, res: Response, next: NextFunction) => {
+  handleWebhook = async (req: Request, res: Response) => {
     try {
       await this.paymentService.handlePaymentWebhook(req.body);
 
@@ -52,37 +48,21 @@ export class PaymentController {
     }
   };
 
-  getPaymentsByOrder = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ) => {
-    try {
-      const customerId = this.getUserIdOrThrow(res);
-      const { orderId } = req.params as { orderId: string };
-      const result = await this.paymentService.getPaymentsByOrder(
-        orderId,
-        customerId,
-      );
-      this.sendSuccess(res, 200, "Payments berhasil diambil", result);
-    } catch (error) {
-      next(error);
-    }
+  getPaymentsByOrder = async (req: Request, res: Response) => {
+    const customerId = this.getUserIdOrThrow(res);
+    const { orderId } = req.params as { orderId: string };
+    const result = await this.paymentService.getPaymentsByOrder(
+      orderId,
+      customerId,
+    );
+    this.sendSuccess(res, 200, "Payments berhasil diambil", result);
   };
 
   // Mock endpoint for testing
-  mockPaymentSuccess = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ) => {
-    try {
-      const { orderId } = req.params as { orderId: string };
-      const result = await this.paymentService.mockPaymentSuccess(orderId);
+  mockPaymentSuccess = async (req: Request, res: Response) => {
+    const { orderId } = req.params as { orderId: string };
+    const result = await this.paymentService.mockPaymentSuccess(orderId);
 
-      res.status(200).json(result);
-    } catch (error) {
-      next(error);
-    }
+    res.status(200).json(result);
   };
 }
