@@ -1,29 +1,19 @@
 import { Router } from "express";
 import { PickupRequestController } from "./pickup-request.controller.js";
-import { PickupRequestService } from "./pickup-request.service.js";
 import { verifyToken } from "../../middlewares/jwt.middleware.js";
 import { ValidationMiddleware } from "../../middlewares/validation.middleware.js";
 import { CreatePickupRequestDTO } from "./dto/create-pickup-request.dto.js";
 import { GetPickupRequestsDTO } from "./dto/get-pickup-requests.dto.js";
-import { PrismaClient } from "../../../generated/prisma/client.js";
 import { JWT_SECRET } from "../../config/env.js";
 
 export class PickupRequestRouter {
   private router: Router;
-  private pickupRequestController: PickupRequestController;
-  private validationMiddleware: ValidationMiddleware;
 
   constructor(
-    prisma: PrismaClient,
-    validationMiddleware: ValidationMiddleware,
+    private pickupRequestController: PickupRequestController,
+    private validationMiddleware: ValidationMiddleware,
   ) {
     this.router = Router();
-    this.validationMiddleware = validationMiddleware;
-
-    const pickupRequestService = new PickupRequestService(prisma);
-    this.pickupRequestController = new PickupRequestController(
-      pickupRequestService,
-    );
 
     this.initializeRoutes();
   }
