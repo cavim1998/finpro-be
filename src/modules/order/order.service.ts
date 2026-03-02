@@ -10,6 +10,7 @@ import {
 import { CreateOrderDTO } from "./dto/create-order.dto.js";
 import { ApiError } from "../../utils/api-error.js";
 import { OrderWhereInput } from "../../../generated/prisma/models.js";
+import { MyOrderSortBy, MyOrderSortOrder } from "./dto/get-my-orders.dto.js";
 
 export class OrderService {
   constructor(private prisma: PrismaClient) {}
@@ -227,6 +228,107 @@ export class OrderService {
         total,
         page,
         limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  };
+
+  getMyOrders = async (params: {
+    customerId: number;
+    page: number;
+    limit: number;
+    status?: OrderStatus;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    sortBy: MyOrderSortBy;
+    sortOrder: MyOrderSortOrder;
+  }) => {
+    const {
+      customerId,
+      page,
+      limit,
+      status,
+      search,
+      startDate,
+      endDate,
+      sortBy,
+      sortOrder,
+    } = params;
+
+    if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+      throw new ApiError("startDate tidak boleh lebih besar dari endDate", 400);
+    }
+
+    const skip = (page - 1) * limit;
+
+    const whereClause: OrderWhereInput = {
+      customerId,
+    };
+
+    if (status) {
+      whereClause.status = status;
+    }
+
+    if (search) {
+      whereClause.orderNo = { contains: search, mode: "insensitive" };
+    }
+
+    if (startDate || endDate) {
+      whereClause.createdAt = {};
+      if (startDate) {
+        whereClause.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        whereClause.createdAt.lte = new Date(endDate);
+      }
+    }
+
+    const orders = await this.prisma.order.findMany({
+      where: whereClause,
+      include: {
+        outlet: {
+          select: {
+            id: true,
+            name: true,
+            addressText: true,
+          },
+        },
+        items: {
+          include: {
+            item: true,
+          },
+        },
+        payments: {
+          where: { status: "PAID" },
+          select: {
+            id: true,
+            paidAt: true,
+          },
+        },
+      },
+      skip,
+      take: limit,
+      orderBy: {
+        [sortBy]: sortOrder,
+      },
+    });
+
+    const total = await this.prisma.order.count({
+      where: whereClause,
+    });
+
+    return {
+      data: orders.map((order) => ({
+        ...order,
+        deliveryDate: order.deliveredAt,
+        isPaid: order.payments.length > 0,
+        itemCount: order.items.reduce((sum, item) => sum + item.qty, 0),
+      })),
+      meta: {
+        page,
+        limit,
+        total,
         totalPages: Math.ceil(total / limit),
       },
     };

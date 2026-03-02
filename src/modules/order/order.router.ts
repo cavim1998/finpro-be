@@ -8,6 +8,7 @@ import { JWT_SECRET } from "../../config/env.js";
 import { ValidationMiddleware } from "../../middlewares/validation.middleware.js";
 import { CreateOrderDTO } from "./dto/create-order.dto.js";
 import { RoleCode } from "../../../generated/prisma/client.js";
+import { GetMyOrdersDTO } from "./dto/get-my-orders.dto.js";
 
 export class OrderRouter {
   private router: Router;
@@ -26,6 +27,14 @@ export class OrderRouter {
       verifyToken(JWT_SECRET),
       authorizeRole([RoleCode.OUTLET_ADMIN, RoleCode.SUPER_ADMIN]),
       this.orderController.findAll,
+    );
+
+    this.router.get(
+      "/my",
+      verifyToken(JWT_SECRET),
+      authorizeRole([RoleCode.CUSTOMER]),
+      this.validationMiddleware.validateQuery(GetMyOrdersDTO),
+      this.orderController.getMyOrders,
     );
 
     this.router.get(
