@@ -45,6 +45,8 @@ import { OrderRouter } from "./modules/order/order.router.js";
 import { PickupService } from "./modules/pickup/pickup.service.js";
 import { PickupController } from "./modules/pickup/pickup.controller.js";
 import { PickupRouter } from "./modules/pickup/pickup.router.js";
+import { PaymentController } from "./modules/payment/payment.controller.js";
+import { PaymentService } from "./modules/payment/payment.service.js";
 import { PaymentRouter } from "./modules/payment/payment.router.js";
 import { WorkerController } from "./modules/worker/worker.controller.js";
 import { WorkerRouter } from "./modules/worker/worker.router.js";
@@ -114,6 +116,8 @@ export class App {
     const workerService = new WorkerService();
     const orderService = new OrderService(prismaClient);
     const adminPickupService = new PickupService(prismaClient);
+    const paymentService = new PaymentService(prismaClient);
+    const pickupRequestService = new PickupRequestService(prismaClient);
     const bypassService = new BypassService(prismaClient);
     const reportService = new ReportService(prismaClient);
     const dashboardService = new DashboardService(prismaClient);
@@ -136,6 +140,10 @@ export class App {
     const workerController = new WorkerController(workerService);
     const orderController = new OrderController(orderService);
     const adminPickupController = new PickupController(adminPickupService);
+    const paymentController = new PaymentController(paymentService);
+    const pickupRequestController = new PickupRequestController(
+      pickupRequestService,
+    );
     const bypassController = new BypassController(bypassService);
     const reportController = new ReportController(reportService);
     const dashboardController = new DashboardController(dashboardService);
@@ -181,12 +189,15 @@ export class App {
 
     // New routers for pickup order feature
     const pickupRequestRouter = new PickupRequestRouter(
-      prismaClient,
+      pickupRequestController,
       validationMiddleware,
     );
     const orderRouter = new OrderRouter(orderController, validationMiddleware);
     const adminPickupRouter = new PickupRouter(adminPickupController);
-    const paymentRouter = new PaymentRouter(prismaClient, validationMiddleware);
+    const paymentRouter = new PaymentRouter(
+      paymentController,
+      validationMiddleware,
+    );
     const workerRouter = new WorkerRouter(validationMiddleware);
     const bypassRouter = new BypassRouter(bypassController);
     const reportRouter = new ReportRouter(
