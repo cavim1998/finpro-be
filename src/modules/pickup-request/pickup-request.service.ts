@@ -5,6 +5,10 @@ import {
 import { ApiError } from "../../utils/api-error.js";
 import { findNearestOutlet } from "../../utils/distance-calculator.js";
 import { CreatePickupRequestDTO } from "./dto/create-pickup-request.dto.js";
+import {
+  PickupRequestSortBy,
+  SortOrder,
+} from "./dto/get-pickup-requests.dto.js";
 
 export class PickupRequestService {
   constructor(private prisma: PrismaClient) {}
@@ -81,14 +85,40 @@ export class PickupRequestService {
     };
   }
 
-  async getPickupRequests(customerId: number, status?: PickupStatus) {
-    const where: any = { customerId };
-    if (status) {
-      where.status = status;
+  async getPickupRequests(
+    customerId: number,
+    params: {
+      page: number;
+      limit: number;
+      status?: PickupStatus;
+      startDate?: string;
+      endDate?: string;
+      sortBy: PickupRequestSortBy;
+      sortOrder: SortOrder;
+    },
+  ) {
+    const { page, limit, status, startDate, endDate, sortBy, sortOrder } =
+      params;
+
+    if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+      throw new ApiError("startDate tidak boleh lebih besar dari endDate", 400);
     }
+
+    const where: any = { customerId };
+    if (status) where.status = status;
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) where.createdAt.lte = new Date(endDate);
+    }
+
+    const skip = (page - 1) * limit;
 
     const pickupRequests = await this.prisma.pickupRequest.findMany({
       where,
+      skip,
+      take: limit,
       include: {
         address: true,
         outlet: {
@@ -107,10 +137,20 @@ export class PickupRequestService {
           },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { [sortBy]: sortOrder },
     });
 
-    return pickupRequests;
+    const total = await this.prisma.pickupRequest.count({ where });
+
+    return {
+      data: pickupRequests,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async getPickupRequestById(id: string, customerId: number) {

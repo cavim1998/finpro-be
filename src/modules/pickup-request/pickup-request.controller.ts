@@ -2,6 +2,11 @@ import { Request, Response, NextFunction } from "express";
 import { PickupRequestService } from "./pickup-request.service.js";
 import { PickupStatus } from "../../../generated/prisma/client.js";
 import { ApiError } from "../../utils/api-error.js";
+import {
+  GetPickupRequestsDTO,
+  PickupRequestSortBy,
+  SortOrder,
+} from "./dto/get-pickup-requests.dto.js";
 
 export class PickupRequestController {
   constructor(private pickupRequestService: PickupRequestService) {}
@@ -40,17 +45,33 @@ export class PickupRequestController {
       if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
       const customerId = parseInt(authUser.sub);
 
-      const { status } = req.query;
+      const {
+        page = 1,
+        limit = 10,
+        status,
+        startDate,
+        endDate,
+        sortBy = PickupRequestSortBy.CREATED_AT,
+        sortOrder = SortOrder.DESC,
+      } = req.query as unknown as GetPickupRequestsDTO;
+
+      const normalizedPage = Number(page) || 1;
+      const normalizedLimit = Number(limit) || 10;
 
       const result = await this.pickupRequestService.getPickupRequests(
         customerId,
-        status as PickupStatus,
+        {
+          page: normalizedPage,
+          limit: normalizedLimit,
+          status: status as PickupStatus | undefined,
+          startDate,
+          endDate,
+          sortBy,
+          sortOrder,
+        },
       );
 
-      res.status(200).json({
-        message: "Pickup requests berhasil diambil",
-        data: result,
-      });
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }

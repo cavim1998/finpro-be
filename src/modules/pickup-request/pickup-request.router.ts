@@ -4,6 +4,7 @@ import { PickupRequestService } from "./pickup-request.service.js";
 import { verifyToken } from "../../middlewares/jwt.middleware.js";
 import { ValidationMiddleware } from "../../middlewares/validation.middleware.js";
 import { CreatePickupRequestDTO } from "./dto/create-pickup-request.dto.js";
+import { GetPickupRequestsDTO } from "./dto/get-pickup-requests.dto.js";
 import { PrismaClient } from "../../../generated/prisma/client.js";
 import { JWT_SECRET } from "../../config/env.js";
 
@@ -39,6 +40,7 @@ export class PickupRequestRouter {
     this.router.get(
       "/",
       verifyToken(JWT_SECRET),
+      this.validationMiddleware.validateQuery(GetPickupRequestsDTO),
       this.pickupRequestController.getPickupRequests,
     );
 

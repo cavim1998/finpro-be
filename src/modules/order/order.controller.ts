@@ -2,6 +2,11 @@ import { Request, Response, NextFunction } from "express";
 import { OrderService } from "./order.service.js";
 import { OrderStatus, RoleCode } from "../../../generated/prisma/client.js";
 import { ApiError } from "../../utils/api-error.js";
+import {
+  GetMyOrdersDTO,
+  MyOrderSortBy,
+  MyOrderSortOrder,
+} from "./dto/get-my-orders.dto.js";
 
 export class OrderController {
   constructor(private orderService: OrderService) {}
@@ -88,6 +93,44 @@ export class OrderController {
         message: "Order detail berhasil diambil",
         data: result,
       });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getMyOrders = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authUser = res.locals.user as { sub?: string };
+      if (!authUser?.sub) throw new ApiError("Unauthorized", 401);
+      const customerId = parseInt(authUser.sub);
+
+      const {
+        page = 1,
+        limit = 10,
+        status,
+        search,
+        startDate,
+        endDate,
+        sortBy = MyOrderSortBy.CREATED_AT,
+        sortOrder = MyOrderSortOrder.DESC,
+      } = req.query as unknown as GetMyOrdersDTO;
+
+      const normalizedPage = Number(page) || 1;
+      const normalizedLimit = Number(limit) || 10;
+
+      const result = await this.orderService.getMyOrders({
+        customerId,
+        page: normalizedPage,
+        limit: normalizedLimit,
+        status: status as OrderStatus | undefined,
+        search,
+        startDate,
+        endDate,
+        sortBy,
+        sortOrder,
+      });
+
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }
