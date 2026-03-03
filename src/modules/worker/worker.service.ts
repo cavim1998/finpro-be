@@ -209,6 +209,7 @@ export class WorkerService {
         orderStationId: s.id,
         orderId: s.orderId,
         orderNo: s.order.orderNo,
+        serviceType: s.order.serviceType,
         outletId: s.order.outletId,
         customerName,
         clothesCount,
@@ -275,6 +276,7 @@ export class WorkerService {
       id: order.id,
       orderNo: order.orderNo,
       orderNumber: order.orderNo,
+      serviceType: order.serviceType,
       status: order.status,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
@@ -346,6 +348,7 @@ export class WorkerService {
       id: history.id,
       orderId: history.orderId,
       orderNo: history.order.orderNo,
+      serviceType: history.order.serviceType,
       orderStatus: history.order.status,
       customerName:
         history.order.customer?.profile?.fullName ||
@@ -366,24 +369,6 @@ export class WorkerService {
     const station = await this.findStationByParam(prisma, stationType, orderId);
     if (!station) throw new ApiError("Order station not found", 404);
     const readyStatus = readyOrderStatusForStation(stationType);
-
-    const active = await prisma.orderStation.findFirst({
-      where: {
-        stationType,
-        assignedWorkerId: userId,
-        status: {
-          in: [StationStatus.IN_PROGRESS, StationStatus.WAITING_BYPASS],
-        },
-      },
-      select: { id: true, orderId: true },
-    });
-
-    if (active && active.orderId !== station.orderId) {
-      throw new ApiError(
-        "You still have an active task. Finish it first.",
-        400,
-      );
-    }
     if (station.status !== StationStatus.PENDING)
       throw new ApiError("Order is not available to claim", 400);
     if (station.assignedWorkerId)

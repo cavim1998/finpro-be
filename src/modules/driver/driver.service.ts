@@ -18,6 +18,17 @@ function getDateOnlyByTimeZone(timeZone = DEFAULT_TZ) {
   return new Date(Date.UTC(y, m - 1, d)); // UTC midnight
 }
 
+function attachSchedulePickupAt<
+  T extends { scheduledPickupAt?: Date | null } | null | undefined,
+>(pickup: T): (T & { schedulePickupAt: Date | null }) | null | undefined {
+  if (!pickup) return pickup as null | undefined;
+
+  return {
+    ...pickup,
+    schedulePickupAt: pickup.scheduledPickupAt ?? null,
+  } as T & { schedulePickupAt: Date | null };
+}
+
 type TodayAttendance = {
   date: Date;
   clockInAt: Date | null;
@@ -162,8 +173,11 @@ export class DriverService {
         })
         .then((items) =>
           items.map((task) => {
-            const deliveryPickup = task.order?.pickupRequest ?? null;
-            const resolvedPickup = task.pickupRequest ?? deliveryPickup;
+            const deliveryPickup = attachSchedulePickupAt(
+              task.order?.pickupRequest ?? null,
+            );
+            const directPickup = attachSchedulePickupAt(task.pickupRequest);
+            const resolvedPickup = directPickup ?? deliveryPickup;
             const resolvedCustomer =
               resolvedPickup?.customer ?? task.order?.customer ?? null;
             const resolvedToLat =
@@ -173,6 +187,14 @@ export class DriverService {
 
             return {
               ...task,
+              pickupRequest: directPickup ?? task.pickupRequest,
+              order: task.order
+                ? {
+                    ...task.order,
+                    pickupRequest: deliveryPickup ?? task.order.pickupRequest,
+                  }
+                : task.order,
+              schedulePickupAt: resolvedPickup?.schedulePickupAt ?? null,
               toLat: resolvedToLat,
               toLng: resolvedToLng,
               customerName: resolvedCustomer?.profile?.fullName ?? null,
@@ -244,7 +266,7 @@ export class DriverService {
     const availablePickupFromOrder = orderPickupItems
       .filter((o) => !!o.pickupRequest)
       .map((o) => ({
-        ...(o.pickupRequest as any),
+        ...attachSchedulePickupAt(o.pickupRequest as any),
         orderId: o.id,
         orderNo: o.orderNo,
         orderStatus: o.status,
@@ -254,7 +276,7 @@ export class DriverService {
     const availableDelivery = readyDeliveryItems
       .filter((o) => !!o.pickupRequest)
       .map((o) => ({
-        ...(o.pickupRequest as any),
+        ...attachSchedulePickupAt(o.pickupRequest as any),
         orderId: o.id,
         orderNo: o.orderNo,
         orderStatus: o.status,
@@ -262,7 +284,10 @@ export class DriverService {
       }));
 
     const pickupItemsAll = [
-      ...pickupItemsRaw.map((p) => ({ ...p, driverAction: "PICKUP" })),
+      ...pickupItemsRaw.map((p) => ({
+        ...attachSchedulePickupAt(p),
+        driverAction: "PICKUP",
+      })),
       ...availablePickupFromOrder,
       ...availableDelivery,
     ].sort(
@@ -351,7 +376,11 @@ export class DriverService {
         include: { pickupRequest: true, order: true },
       });
 
-      return task;
+      return {
+        ...task,
+        pickupRequest: attachSchedulePickupAt(task.pickupRequest),
+        schedulePickupAt: task.pickupRequest?.scheduledPickupAt ?? null,
+      };
     });
   }
 
@@ -555,7 +584,11 @@ export class DriverService {
         include: { order: true, pickupRequest: true },
       });
 
-      return task;
+      return {
+        ...task,
+        pickupRequest: attachSchedulePickupAt(task.pickupRequest),
+        schedulePickupAt: task.pickupRequest?.scheduledPickupAt ?? null,
+      };
     });
   }
 
